@@ -5,12 +5,13 @@
 # Created On: 09 Jan 2023
 # Purpose:
 # Notes:
-# Code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
+# Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import sleep, time
 from datetime import datetime
+
 
 class TelloDrone:
   # Precond:
@@ -69,6 +70,165 @@ class TelloDrone:
       return False
     res = self.__send("land")
     return res is not None and res == 'ok'
+  
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone up to val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def up(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("up " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone down to val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def down(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("down " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone right val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def right(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("right " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone left val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def left(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("left " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone forward val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def forward(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("forward " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Moves the drone backward val centimeters.
+  #   Returns False if the command could not be sent for any reason.
+  def backward(self, val):
+    if not self.connected or val not in range(20, 501):
+      return False
+    res = self.__send("back " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Rotates the drone clockwise val degrees.
+  #   Returns False if the command could not be sent for any reason.
+  def rotate_cw(self, val):
+    if not self.connected or val not in range(1, 361):
+      return False
+    res = self.__send("cw " + str(val))
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   val is an integer representing the amount to move
+  #
+  # Postcond:
+  #   Rotates the drone counterclockwise val degrees.
+  #   Returns False if the command could not be sent for any reason.
+  def rotate_ccw(self, val):
+    if not self.connected or val not in range(1, 361):
+      return False
+    res = self.__send("ccw " + str(val))
+    return res is not None and res == 'ok'
+  
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Flips the drone left.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def flip_left(self):
+    if not self.connected:
+      return False
+    res = self.__send("flip l")
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Flips the drone right.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def flip_right(self):
+    if not self.connected:
+      return False
+    res = self.__send("flip r")
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Flips the drone forward.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def flip_forward(self):
+    if not self.connected:
+      return False
+    res = self.__send("flip f")
+    return res is not None and res == 'ok'
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Flips the drone backward.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def flip_backward(self):
+    if not self.connected:
+      return False
+    res = self.__send("flip b")
+    return res is not None and res == 'ok'
+  
+  # Precond:
+  #   x the amount to move in the x-axis.
+  #   y the amount to move in the y-axis.
+  #   z the amount to move in the z-axis.
+  #   spd is the speed of movement
+  #
+  # Postcond:
+  #   Moves the drone by the given x, y, and z values.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def move(self, x, y, z, spd):
+    if not self.connected or not (20 < max(abs(x), abs(y), abs(z)) < 500) or spd not in range(10, 101):
+      return False
+    coord_str = ' '.join([str(x), str(y), str(z)])
+    res = self.__send("go " + coord_str)
   
   # ======================================
   # VIDEO METHODS
@@ -182,4 +342,4 @@ class TelloDrone:
       except OSError as exc:
         if not self.stop:
           print("Caught exception socket.error : %s" % exc)
-  
+          
