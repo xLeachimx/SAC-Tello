@@ -4,13 +4,16 @@
 # License: GNU GPLv3
 # Created On: 09 Jan 2023
 # Purpose:
+#   A basic method of controlling a Tello Drone and allowing a video feed.
+#
 # Notes:
-# Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
+#   Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
-from time import sleep, time
+from time import time
 from datetime import datetime
+import cv2
 
 
 class TelloDrone:
@@ -37,8 +40,16 @@ class TelloDrone:
     self.log = []
     self.MAX_TIME_OUT = 10  # measured in seconds
     
+    # Connecting the video
+    self.video_connect_str = 'udp://192.168.10.1:11111'
+    self.video_stream = None
+    self.video_thread = Thread(target=self.__receive_video)
+    self.last_frame = None
+    self.frame_width = 0
+    self.frame_height = 0
+    
     # Connection/Drone Accounting
-    self.pos = [0, 0, 0]  # Measured in cm
+    self.pos = [0, 0, 0]  # Measured in cm, NOT IN USE
     self.connected = False
     
   # ======================================
@@ -229,10 +240,56 @@ class TelloDrone:
       return False
     coord_str = ' '.join([str(x), str(y), str(z)])
     res = self.__send("go " + coord_str)
+    return res is not None and res == 'ok'
   
   # ======================================
   # VIDEO METHODS
   # ======================================
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Turns the video stream on.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def stream_on(self):
+    if not self.connected:
+      return False
+    res = self.__send("streamon")
+    if res is not None and res == 'ok':
+      # Setup the video stream
+      self.video_stream = cv2.VideoCapture(self.video_connect_str)
+      self.video_stream.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+      self.frame_width = self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)
+      self.frame_height = self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+      return True
+    return False
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Turns the video stream off.
+  #   Returns False if the command could not be sent or executed for any reason.
+  def stream_off(self):
+    if not self.connected:
+      return False
+    # Stop video feed if needed
+    if self.video_stream is not None:
+      self.video_stream = None
+      self.video_thread.join()
+      self.last_frame = None
+    res = self.__send("streamoff")
+    return res is not None and res == 'ok'
+  
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Returns the last frame taken by the Tello.
+  #   Returns None if the stream is off.
+  def get_frame(self):
+    return self.last_frame
   
   # ======================================
   # MANAGEMENT METHODS
@@ -251,6 +308,7 @@ class TelloDrone:
       res = self.__send("Command")
       if res is not None and res == 'ok':
         self.connected = True
+        self.stream_on()
         return True
     return False
   
@@ -268,7 +326,7 @@ class TelloDrone:
   #   None.
   #
   # Postcond:
-  #   Sends the emergency command. Does not wait for response.
+  #   Sends the emergency command, in triplicate. Does not wait for response.
   def emergency(self):
     for _ in range(3):
       self.__send_nowait("emergency")
@@ -284,8 +342,8 @@ class TelloDrone:
     self.send_channel.close()
     self.receive_thread.join()
     t = datetime.now()
-    log_fname = t.strftime("%Y-%m-%d-%X") + '.log'
-    with open(log_fname, 'w') as fout:
+    log_name = t.strftime("%Y-%m-%d-%X") + '.log'
+    with open(log_name, 'w') as fout:
       count = 0
       for entry in self.log:
         print("Message[" + str(count) + "]:", entry[0], file=fout)
@@ -342,4 +400,16 @@ class TelloDrone:
       except OSError as exc:
         if not self.stop:
           print("Caught exception socket.error : %s" % exc)
-          
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Receives video messages from the Tello and logs them.
+  def __receive_video(self):
+    while not self.stop and self.video_stream is not None:
+      ret, img = self.video_stream.read()
+      if ret:
+        self.last_frame = img
+    self.video_stream.release()
+    cv2.destroyAllWindows()
