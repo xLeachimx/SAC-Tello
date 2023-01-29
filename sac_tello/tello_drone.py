@@ -18,7 +18,7 @@ import cv2
 
 class TelloDrone:
   # Precond:
-  #   The computer creating the TelloDrone instance is connected to the Tello's wifi.
+  #   The computer creating the TelloDrone instance is connected to the Tello's Wi-Fi.
   #
   # Postcond:
   #   Sets up a connection with the Tello Drone.
@@ -44,12 +44,26 @@ class TelloDrone:
     self.video_connect_str = 'udp://192.168.10.1:11111'
     self.video_stream = None
     self.video_thread = Thread(target=self.__receive_video)
+    self.video_thread.daemon = True
     self.last_frame = None
+    self.stream_active = False
     self.frame_width = 0
     self.frame_height = 0
     
+    # Connecting to current state information
+    self.state_addr = ('192.168.10.1', 8890)
+    self.local_state_addr = ('', 8890)
+    self.state_channel = socket(AF_INET, SOCK_DGRAM)
+    self.state_channel.bind(self.local_state_addr)
+    self.last_state = None
+    
+    self.receive_state_thread = Thread(target=self.__receive_state)
+    self.receive_state_thread.daemon = True
+    self.receive_state_thread.start()
+    
     # Connection/Drone Accounting
-    self.pos = [0, 0, 0]  # Measured in cm, NOT IN USE
+    self.pos = [0, 0, 0]  # Measured in cm, not in use
+    self.yaw = 0  # The important rotation
     self.connected = False
     
   # ======================================
@@ -257,11 +271,13 @@ class TelloDrone:
       return False
     res = self.__send("streamon")
     if res is not None and res == 'ok':
-      # Setup the video stream
+      # Set up the video stream
+      self.stream_active = True
       self.video_stream = cv2.VideoCapture(self.video_connect_str)
       self.video_stream.set(cv2.CAP_PROP_BUFFERSIZE, 2)
       self.frame_width = self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)
       self.frame_height = self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+      self.video_thread.start()
       return True
     return False
 
@@ -275,9 +291,10 @@ class TelloDrone:
     if not self.connected:
       return False
     # Stop video feed if needed
-    if self.video_stream is not None:
-      self.video_stream = None
+    if self.stream_active:
+      self.stream_active = False
       self.video_thread.join()
+      self.video_stream = None
       self.last_frame = None
     res = self.__send("streamoff")
     return res is not None and res == 'ok'
@@ -326,6 +343,14 @@ class TelloDrone:
   #   None.
   #
   # Postcond:
+  #   Returns the last state received from the Tello as a dictionary.
+  def state(self):
+    return self.last_state
+  
+  # Precond:
+  #   None.
+  #
+  # Postcond:
   #   Sends the emergency command, in triplicate. Does not wait for response.
   def emergency(self):
     for _ in range(3):
@@ -339,8 +364,15 @@ class TelloDrone:
   def close(self):
     self.connected = False
     self.stop = True
+    if self.stream_active:
+      self.stream_active = False
+      self.video_thread.join()
+      self.last_frame = None
+      self.video_stream = None
     self.send_channel.close()
+    self.state_channel.close()
     self.receive_thread.join()
+    self.receive_state_thread.join()
     t = datetime.now()
     log_name = t.strftime("%Y-%m-%d-%X") + '.log'
     with open(log_name, 'w') as fout:
@@ -407,9 +439,32 @@ class TelloDrone:
   # Postcond:
   #   Receives video messages from the Tello and logs them.
   def __receive_video(self):
-    while not self.stop and self.video_stream is not None:
+    while not self.stop and self.stream_active:
       ret, img = self.video_stream.read()
       if ret:
         self.last_frame = img
     self.video_stream.release()
     cv2.destroyAllWindows()
+
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Receives states messages from the Tello and logs them.
+  def __receive_state(self):
+    while not self.stop:
+      try:
+        response, ip = self.state_channel.recvfrom(1024)
+        response = response.decode('utf-8')
+        response = response.strip()
+        vals = response.split(';')
+        state = {}
+        for item in vals:
+          if item == '':
+            continue
+          label, val = item.split(':')
+          state[label] = val
+        self.last_state = state
+      except OSError as exc:
+        if not self.stop:
+          print("Caught exception socket.error : %s" % exc)

@@ -5,3 +5,7 @@
 # Created On: 09 Jan 2023
 # Purpose:
 # Notes:
+
+
+from tello_drone import TelloDrone
+from face_recognizer import FaceRecognizer
