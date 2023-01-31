@@ -1,13 +1,12 @@
-# File: tello_drone.py
+# File: rc_tello.py
 # Author: Michael Huelsman
 # Copyright: Dr. Michael Andrew Huelsman 2023
 # License: GNU GPLv3
-# Created On: 09 Jan 2023
+# Created On: 31 Jan 2023
 # Purpose:
-#   A basic method of controlling a Tello Drone and allowing a video feed.
-#
+#   A simple interface for controlling the Tello via RC commands.
 # Notes:
-#   Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
+
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
@@ -15,10 +14,9 @@ from time import time
 from datetime import datetime
 import cv2
 
-
-class TelloDrone:
+class TelloRC:
   # Precond:
-  #   The computer creating the TelloDrone instance is connected to the Tello's Wi-Fi.
+  #   The computer creating the TelloRC instance is connected to the Tello's Wi-Fi.
   #
   # Postcond:
   #   Sets up a connection with the Tello Drone.
@@ -31,14 +29,21 @@ class TelloDrone:
     self.send_channel = socket(AF_INET, SOCK_DGRAM)
     self.send_channel.bind(self.local_addr)
     
+    self.stop = True
+    self.connected = False
+    
+    # Setup RC sending thread
+    self.send_thread = Thread(target=self.__send_rc)
+    self.send_thread.daemon = True
+    
     # Setup receiving thread
     self.receive_thread = Thread(target=self.__receive)
     self.receive_thread.daemon = True
-    self.stop = False
-    self.receive_thread.start()
     
+    # Setup logs
     self.log = []
-    self.MAX_TIME_OUT = 10  # measured in seconds
+    self.MAX_TIME_OUT = 1  # measured in seconds
+    self.rc_sleep = 0.03  # how long the rc command sleeps between sends (seconds)
     
     # Connecting the video
     self.video_connect_str = 'udp://192.168.10.1:11111'
@@ -49,29 +54,66 @@ class TelloDrone:
     self.stream_active = False
     self.frame_width = 0
     self.frame_height = 0
-    
+
     # Connecting to current state information
     self.state_addr = ('192.168.10.1', 8890)
     self.local_state_addr = ('', 8890)
     self.state_channel = socket(AF_INET, SOCK_DGRAM)
     self.state_channel.bind(self.local_state_addr)
     self.last_state = None
-    
+
     self.receive_state_thread = Thread(target=self.__receive_state)
     self.receive_state_thread.daemon = True
     self.receive_state_thread.start()
     
-    # Connection/Drone Accounting
-    self.pos = [0, 0, 0]  # Measured in cm, not in use
-    self.yaw = 0  # The important rotation
-    self.connected = False
+    # Set up RC accounting
+    self.rc = [0, 0, 0, 0]
     
+  def startup(self):
+    self.stop = False
+    self.receive_thread.start()
+    if self.__connect(5) and self.stream_on():
+      self.send_thread.start()
+      return True
+    return False
   # ======================================
   # COMMAND METHODS
   # ======================================
   # Section Notes:
   #   All commands check to see if the drone has been connected and put into SDK mode before sending commands.
   
+  # Precond:
+  #   The value to set the forward throttle to.
+  #
+  # Postcond:
+  #   Set forward throttle.
+  def set_x(self, val):
+    self.rc[1] = min(max(-100, int(val)), 100)
+
+  # Precond:
+  #   The value to set the right throttle to.
+  #
+  # Postcond:
+  #   Set right throttle.
+  def set_y(self, val):
+    self.rc[0] = min(max(-100, int(val)), 100)
+
+  # Precond:
+  #   The value to set the vertical throttle to.
+  #
+  # Postcond:
+  #   Set vertical throttle.
+  def set_z(self, val):
+    self.rc[3] = min(max(-100, int(val)), 100)
+
+  # Precond:
+  #   The value to set the rotation throttle to.
+  #
+  # Postcond:
+  #   Set rotation throttle.
+  def set_rot(self, val):
+    self.rc[4] = min(max(-100, int(val)), 100)
+
   # Precond:
   #   None.
   #
@@ -83,7 +125,7 @@ class TelloDrone:
       return False
     res = self.__send("takeoff")
     return res is not None and res == 'ok'
-
+  
   # Precond:
   #   None.
   #
@@ -97,102 +139,6 @@ class TelloDrone:
     return res is not None and res == 'ok'
   
   # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone up to val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def up(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("up " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone down to val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def down(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("down " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone right val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def right(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("right " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone left val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def left(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("left " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone forward val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def forward(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("forward " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Moves the drone backward val centimeters.
-  #   Returns False if the command could not be sent for any reason.
-  def backward(self, val):
-    if not self.connected or val not in range(20, 501):
-      return False
-    res = self.__send("back " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Rotates the drone clockwise val degrees.
-  #   Returns False if the command could not be sent for any reason.
-  def rotate_cw(self, val):
-    if not self.connected or val not in range(1, 361):
-      return False
-    res = self.__send("cw " + str(val))
-    return res is not None and res == 'ok'
-
-  # Precond:
-  #   val is an integer representing the amount to move
-  #
-  # Postcond:
-  #   Rotates the drone counterclockwise val degrees.
-  #   Returns False if the command could not be sent for any reason.
-  def rotate_ccw(self, val):
-    if not self.connected or val not in range(1, 361):
-      return False
-    res = self.__send("ccw " + str(val))
-    return res is not None and res == 'ok'
-  
-  # Precond:
   #   None.
   #
   # Postcond:
@@ -203,7 +149,7 @@ class TelloDrone:
       return False
     res = self.__send("flip l")
     return res is not None and res == 'ok'
-
+  
   # Precond:
   #   None.
   #
@@ -215,7 +161,7 @@ class TelloDrone:
       return False
     res = self.__send("flip r")
     return res is not None and res == 'ok'
-
+  
   # Precond:
   #   None.
   #
@@ -227,7 +173,7 @@ class TelloDrone:
       return False
     res = self.__send("flip f")
     return res is not None and res == 'ok'
-
+  
   # Precond:
   #   None.
   #
@@ -239,27 +185,11 @@ class TelloDrone:
       return False
     res = self.__send("flip b")
     return res is not None and res == 'ok'
-  
-  # Precond:
-  #   x the amount to move in the x-axis.
-  #   y the amount to move in the y-axis.
-  #   z the amount to move in the z-axis.
-  #   spd is the speed of movement
-  #
-  # Postcond:
-  #   Moves the drone by the given x, y, and z values.
-  #   Returns False if the command could not be sent or executed for any reason.
-  def move(self, x, y, z, spd):
-    if not self.connected or not (20 < max(abs(x), abs(y), abs(z)) < 500) or spd not in range(10, 101):
-      return False
-    coord_str = ' '.join([str(x), str(y), str(z)])
-    res = self.__send("go " + coord_str)
-    return res is not None and res == 'ok'
-  
+ 
   # ======================================
   # VIDEO METHODS
   # ======================================
-
+  
   # Precond:
   #   None.
   #
@@ -280,7 +210,7 @@ class TelloDrone:
       self.video_thread.start()
       return True
     return False
-
+  
   # Precond:
   #   None.
   #
@@ -308,6 +238,14 @@ class TelloDrone:
   def get_frame(self):
     return self.last_frame
   
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Returns the resolution of a frame.
+  def get_res(self):
+    return self.frame_width, self.frame_height
+  
   # ======================================
   # MANAGEMENT METHODS
   # ======================================
@@ -320,7 +258,7 @@ class TelloDrone:
   #     switch the drone into SDK mode.
   #   Returns true if the connection was made.
   #   Returns false if there was a problem connecting and attempts were exceeded.
-  def connect(self, attempts=5):
+  def __connect(self, attempts=5):
     for _ in range(attempts):
       res = self.__send("Command")
       if res is not None and res == 'ok':
@@ -381,11 +319,11 @@ class TelloDrone:
         print("Message[" + str(count) + "]:", entry[0], file=fout)
         print("Response[" + str(count) + "]:", entry[1], file=fout)
         count += 1
-    
+  
   # ======================================
   # PRIVATE METHODS
   # ======================================
-
+  
   # Precond:
   #   mess is a string containing the message to send.
   #
@@ -400,11 +338,22 @@ class TelloDrone:
     start = time()
     while self.log[-1][1] is None:
       now = time()
-      if (now-start) > self.MAX_TIME_OUT:
+      if (now - start) > self.MAX_TIME_OUT:
         self.log[-1][1] = "TIMED OUT"
         return None
     return self.log[-1][1]
 
+  # Precond:
+  #   None.
+  #
+  # Postcond:
+  #   Sends RC messages to the tello based on internal throttle numbers.
+  def __send_rc(self):
+    while not self.stop:
+      cmd = 'rc ' + ' '.join(map(str, self.rc))
+      self.__send(cmd)
+      
+  
   # Precond:
   #   mess is a string containing the message to send.
   #
@@ -413,10 +362,10 @@ class TelloDrone:
   #   Does not wait for a response.
   #   Used (internally) only for sending the emergency signal (which is sent in triplicate.)
   def __send_nowait(self, msg):
-    self.log.append([msg, None])
+    self.log.append([msg,None])
     self.send_channel.sendto(msg.encode('utf-8', self.tello_addr))
     return None
-
+  
   # Precond:
   #   None.
   #
@@ -432,7 +381,7 @@ class TelloDrone:
       except OSError as exc:
         if not self.stop:
           print("Caught exception socket.error : %s" % exc)
-
+  
   # Precond:
   #   None.
   #
@@ -445,7 +394,7 @@ class TelloDrone:
         self.last_frame = img
     self.video_stream.release()
     cv2.destroyAllWindows()
-
+  
   # Precond:
   #   None.
   #
