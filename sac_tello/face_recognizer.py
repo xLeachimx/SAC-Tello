@@ -110,5 +110,15 @@ class FaceRecognizer:
       if person not in self.encodings:
         self.encodings[person] = []
       self.encodings[person].extend(loaded[person])
-        
+
+  # Precond:
+  #   filename is the path to a file to save the serialized face encodings to.
+  #
+  # Postcond:
+  #   Saves the known face encodings to the provided file.
+  # Note:
+  #   No exceptions handled by this method.
+  def save_serialized(self, filename):
+    with open(filename, 'wb') as fout:
+      pickle.dump(self.encodings, fout)
         
