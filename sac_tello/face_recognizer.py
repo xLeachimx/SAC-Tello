@@ -49,7 +49,7 @@ class FaceRecognizer:
   def recognize_faces(self, img, min_dist=0.6):
     locations = face_recognition.face_locations(img)
     encodings = face_recognition.face_encodings(img, locations)
-    names = self.encodings.keys()
+    names = list(self.encodings.keys())
     distances = np.ones(len(names))
     idents = []
     for encoding in encodings:
