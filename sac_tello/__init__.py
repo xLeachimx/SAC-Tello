@@ -47,10 +47,11 @@ if __name__ == '__main__':
         else:
           key_holds[key] = 0
         key_holds[key] = max(0, min(5, key_holds[key]))
-      tello.set_x(acc_curve(key_holds['w']) - acc_curve(key_holds['s']))
-      tello.set_y(acc_curve(key_holds['d']) - acc_curve(key_holds['a']))
-      tello.set_z(acc_curve(key_holds['up']) - acc_curve(key_holds['down']))
-      tello.set_rot(acc_curve(key_holds['q']) - acc_curve(key_holds['e']))
+      x = acc_curve(key_holds['w']) - acc_curve(key_holds['s'])
+      y = acc_curve(key_holds['d']) - acc_curve(key_holds['a'])
+      z = acc_curve(key_holds['up']) - acc_curve(key_holds['down'])
+      rot = acc_curve(key_holds['q']) - acc_curve(key_holds['e'])
+      tello.set_rc(x, y, z, rot)
       img = tello.get_frame()
       if img is not None:
         img = pg.image.frombuffer(img.tobytes(), img.shape[1::-1], "BGR")

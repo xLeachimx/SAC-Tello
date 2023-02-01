@@ -229,9 +229,10 @@ class TelloRC:
           self.stream_active = True
           self.video_stream = cv2.VideoCapture(self.video_connect_str)
           self.video_stream.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+          self.video_stream.set(cv2.CAP_PROP_FPS, 30)
+          self.video_stream.set(cv2.CAP_PROP_FOURCC, cv2.FOURCC('H', '2', '6', '4'));
           self.frame_width = self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)
           self.frame_height = self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
-          print(self.video_stream.get(cv2.CAP_PROP_FPS))
           self.video_thread.start()
       return True
     return False
