@@ -32,10 +32,6 @@ class TelloRC:
     self.stop = True
     self.connected = False
 
-    # Setup RC sending thread
-    self.send_thread = Thread(target=self.__send_rc)
-    self.send_thread.daemon = True
-
     # Setup receiving thread
     self.receive_thread = Thread(target=self.__receive)
     self.receive_thread.daemon = True
@@ -73,7 +69,6 @@ class TelloRC:
     self.stop = False
     self.receive_thread.start()
     if self.__connect(5) and self.stream_on():
-      self.send_thread.start()
       self.receive_state_thread.start()
       return True
     return False
@@ -90,7 +85,10 @@ class TelloRC:
   # Postcond:
   #   Set forward throttle.
   def set_x(self, val):
-    self.rc[1] = min(max(-100, int(val)), 100)
+    nv = min(max(-100, int(val)), 100)
+    if nv != self.rc[1]:
+      self.rc[1] = nv
+      self.__send_rc()
 
   # Precond:
   #   The value to set the right throttle to.
@@ -98,7 +96,10 @@ class TelloRC:
   # Postcond:
   #   Set right throttle.
   def set_y(self, val):
-    self.rc[0] = min(max(-100, int(val)), 100)
+    nv = min(max(-100, int(val)), 100)
+    if nv != self.rc[1]:
+      self.rc[0] = nv
+      self.__send_rc()
 
   # Precond:
   #   The value to set the vertical throttle to.
@@ -106,7 +107,10 @@ class TelloRC:
   # Postcond:
   #   Set vertical throttle.
   def set_z(self, val):
-    self.rc[3] = min(max(-100, int(val)), 100)
+    nv = min(max(-100, int(val)), 100)
+    if nv != self.rc[1]:
+      self.rc[2] = nv
+      self.__send_rc()
 
   # Precond:
   #   The value to set the rotation throttle to.
@@ -114,7 +118,24 @@ class TelloRC:
   # Postcond:
   #   Set rotation throttle.
   def set_rot(self, val):
-    self.rc[4] = min(max(-100, int(val)), 100)
+    nv = min(max(-100, int(val)), 100)
+    if nv != self.rc[1]:
+      self.rc[3] = nv
+      self.__send_rc()
+
+  # Precond:
+  #   x, y, z, and rot are numberic calues indicating the rc settings.
+  #
+  # Postcond:
+  #   Updates the rc and sends the command if anything has changed.
+  def set_rc(self, x, y, z, rot):
+    change = False
+    nx = min(max(-100, int(x)), 100)
+    ny = min(max(-100, int(y)), 100)
+    nz = min(max(-100, int(z)), 100)
+    nrot = min(max(-100, int(rot)), 100)
+    if [nx, ny, nz, nrot] != self.rc:
+      self.__send_rc()
 
   # Precond:
   #   None.
@@ -353,11 +374,9 @@ class TelloRC:
   # Postcond:
   #   Sends RC messages to the tello based on internal throttle numbers.
   def __send_rc(self):
-    while not self.stop:
-      cmd = 'rc ' + ' '.join(map(str, self.rc))
-      self.rc_log.append(cmd)
-      self.__send_nowait(cmd)
-      sleep(1/10)
+    cmd = 'rc ' + ' '.join(map(str, self.rc))
+    self.rc_log.append(cmd)
+    self.__send_nowait(cmd)
 
 
   # Precond:

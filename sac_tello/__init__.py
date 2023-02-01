@@ -15,6 +15,9 @@ from rc_tello import TelloRC
 if __name__ == '__main__':
   import pygame as pg
   from time import perf_counter
+  from math import pow
+  def acc_curve(t):
+    return pow(101, t/5) - 1
   tello = TelloRC()
   tello.startup()
   pg.init()
@@ -22,8 +25,10 @@ if __name__ == '__main__':
   running = True
   frame_delta = 1/25
   frame_start = perf_counter()
+  key_holds = {'w':0, 's':0, 'd':0, 'a':0, 'q':0, 'e':0, 'up':0, 'down':0}
   while running:
-    if (perf_counter() - frame_start) >= frame_delta:
+    delta = (perf_counter() - frame_start)
+    if delta >= frame_delta:
       frame_start = perf_counter()
       for event in pg.event.get():
         if event.type == pg.QUIT:
@@ -35,10 +40,17 @@ if __name__ == '__main__':
             tello.land()
           elif event.key == pg.K_BACKSPACE:
             tello.rc = [0, 0, 0, 0]
-          elif event.key == pg.K_q:
-            tello.rc[3] = 100
-          elif event.key == pg.K_e:
-            tello.rc[3] = -100
+      key_state = pg.key.get_pressed()
+      for key in key_holds:
+        if key_state[pg.key.key_code(key)]:
+          key_holds[key] += delta
+        else:
+          key_holds[key] = 0
+        key_holds[key] = max(0, min(5, key_holds[key]))
+      tello.set_x(acc_curve(key_holds['w']) - acc_curve(key_holds['s']))
+      tello.set_y(acc_curve(key_holds['d']) - acc_curve(key_holds['a']))
+      tello.set_z(acc_curve(key_holds['up']) - acc_curve(key_holds['down']))
+      tello.set_rot(acc_curve(key_holds['q']) - acc_curve(key_holds['e']))
       img = tello.get_frame()
       if img is not None:
         img = pg.image.frombuffer(img.tobytes(), img.shape[1::-1], "BGR")
