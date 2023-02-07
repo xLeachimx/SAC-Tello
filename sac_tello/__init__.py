@@ -16,8 +16,16 @@ if __name__ == '__main__':
   import pygame as pg
   from time import perf_counter
   from math import pow
+  
   def acc_curve(t):
     return pow(101, t/5) - 1
+  
+  def render_speeds(vx, vy, vz, vrot):
+    render = "X:", str(vx), "Y:", str(vy), "Z:", str(vz), "R:", str(vrot)
+    render = ' '.join(render)
+    font = pg.font.Font(pg.font.get_default_font(), 32)
+    return font.render(render, True, (255, 255, 255), (0, 0, 0))
+
   tello = TelloRC()
   tello.startup()
   pg.init()
@@ -25,7 +33,7 @@ if __name__ == '__main__':
   running = True
   frame_delta = 1/25
   frame_start = perf_counter()
-  key_holds = {'w':0, 's':0, 'd':0, 'a':0, 'q':0, 'e':0, 'up':0, 'down':0}
+  key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'up': 0, 'down': 0}
   while running:
     delta = (perf_counter() - frame_start)
     if delta >= frame_delta:
@@ -52,6 +60,7 @@ if __name__ == '__main__':
       z = acc_curve(key_holds['up']) - acc_curve(key_holds['down'])
       rot = acc_curve(key_holds['q']) - acc_curve(key_holds['e'])
       tello.set_rc(x, y, z, rot)
+      display.blit(render_speeds(x, y, z, rot), (0, 0))
       img = tello.get_frame()
       if img is not None:
         img = pg.image.frombuffer(img.tobytes(), img.shape[1::-1], "BGR")

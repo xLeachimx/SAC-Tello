@@ -63,7 +63,7 @@ class TelloRC:
     self.receive_state_thread.daemon = True
 
     # Set up RC accounting
-    self.rc = [0, 0, 0, 30]
+    self.rc = [0, 0, 0, 0]
 
   def startup(self):
     self.stop = False
@@ -135,6 +135,7 @@ class TelloRC:
     nz = min(max(-100, int(z)), 100)
     nrot = min(max(-100, int(rot)), 100)
     if [nx, ny, nz, nrot] != self.rc:
+      self.rc = [nx, ny, nz, nrot]
       self.__send_rc()
 
   # Precond:

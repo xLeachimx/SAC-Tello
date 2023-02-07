@@ -395,7 +395,7 @@ class TelloDrone:
   #   Returns None if the message failed.
   def __send(self, msg):
     self.log.append([msg, None])
-    self.send_channel.sendto(msg.encode('utf-8', self.tello_addr))
+    self.send_channel.sendto(msg.encode('utf-8'), self.tello_addr)
     # Response wait loop
     start = time()
     while self.log[-1][1] is None:
@@ -414,7 +414,7 @@ class TelloDrone:
   #   Used (internally) only for sending the emergency signal (which is sent in triplicate.)
   def __send_nowait(self, msg):
     self.log.append([msg, None])
-    self.send_channel.sendto(msg.encode('utf-8', self.tello_addr))
+    self.send_channel.sendto(msg.encode('utf-8'), self.tello_addr)
     return None
 
   # Precond:
