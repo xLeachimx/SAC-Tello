@@ -10,7 +10,7 @@
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
-from time import time, sleep
+from time import time, perf_counter
 from datetime import datetime
 import cv2
 
@@ -433,19 +433,129 @@ class TelloRC:
     # Postcond:
     #   Receives states messages from the Tello and logs them.
     def __receive_state(self):
-    while not self.stop:
-        try:
-            response, ip = self.state_channel.recvfrom(1024)
-            response = response.decode('utf-8')
-            response = response.strip()
-            vals = response.split(';')
-            state = {}
-            for item in vals:
-                if item == '':
-                    continue
-                label, val = item.split(':')
-                state[label] = val
-            self.last_state = state
-        except OSError as exc:
-            if not self.stop:
-                print("Caught exception socket.error : %s" % exc)
+      while not self.stop:
+          try:
+              response, ip = self.state_channel.recvfrom(1024)
+              response = response.decode('utf-8')
+              response = response.strip()
+              vals = response.split(';')
+              state = {}
+              for item in vals:
+                  if item == '':
+                      continue
+                  label, val = item.split(':')
+                  state[label] = val
+              self.last_state = state
+          except OSError as exc:
+              if not self.stop:
+                  print("Caught exception socket.error : %s" % exc)
+
+
+import pygame as pg
+from math import log1p
+class RCFlight:
+  def __init__(self):
+    self.tello = TelloRC()
+    self.input_thread = Thread(target=self.__inp_proc())
+    self.input_thread.daemon = True
+    self.vel_timing = 5
+    self.active = False
+    pg.init()
+  
+  def video_loop(self):
+    frame_start = perf_counter()
+    frame_delta = 1/30
+    display = pg.display.set_mode(self.tello.get_res())
+    while self.active:
+      img = self.tello.get_frame()
+      if img is not None:
+        img = pg.image.frombuffer(img.tobytes(), img.shape[1::-1], "BGR")
+        display.blit(img, (0, 0))
+        pg.display.flip()
+  
+  def __vel_curve(self, t):
+    return 100 * (log1p(t) / log1p(self.vel_timing))
+  
+  def __inp_proc(self):
+    poll_start = perf_counter()
+    poll_delta = 1/30
+    key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'up': 0, 'down': 0}
+    while self.active:
+      delta = (perf_counter() - poll_start)
+      if delta >= poll_delta:
+        poll_start = perf_counter()
+        for event in pg.event.get():
+          if event.type == pg.QUIT:
+            self.active = False
+          elif event.type == pg.KEYDOWN:
+            if event.key == pg.K_t:
+              self.tello.takeoff()
+            elif event.key == pg.K_l:
+              self.tello.land()
+            elif event.key == pg.K_ESCAPE:
+              self.tello.emergency()
+        key_state = pg.key.get_pressed()
+        for key in key_holds:
+          if key_state[pg.key.key_code(key)]:
+            key_holds[key] += delta
+          else:
+            key_holds[key] = 0
+          key_holds[key] = max(0, min(5, key_holds[key]))
+        y = self.__vel_curve(key_holds['w']) - self.__vel_curve(key_holds['s'])
+        x = self.__vel_curve(key_holds['d']) - self.__vel_curve(key_holds['a'])
+        z = self.__vel_curve(key_holds['up']) - self.__vel_curve(key_holds['down'])
+        rot = self.__vel_curve(key_holds['e']) - self.__vel_curve(key_holds['q'])
+        self.tello.set_rc(x, y, z, rot)
+
+
+if __name__ == '__main__':
+    import pygame as pg
+    from time import perf_counter
+    from math import log1p
+    
+    
+    def vel_curve(t):
+        return 100 * (log1p(t) / log1p(5))
+    
+    
+    tello = TelloRC()
+    tello.startup()
+    pg.init()
+    display = pg.display.set_mode(tello.get_res())
+    running = True
+    frame_delta = 1 / 25
+    frame_start = perf_counter()
+    key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'up': 0, 'down': 0}
+    while running:
+        delta = (perf_counter() - frame_start)
+        if delta >= frame_delta:
+            frame_start = perf_counter()
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    running = False
+                elif event.type == pg.KEYDOWN:
+                    if event.key == pg.K_t:
+                        tello.takeoff()
+                    elif event.key == pg.K_l:
+                        tello.land()
+                    elif event.key == pg.K_BACKSPACE:
+                        tello.rc = [0, 0, 0, 0]
+            key_state = pg.key.get_pressed()
+            for key in key_holds:
+                if key_state[pg.key.key_code(key)]:
+                    key_holds[key] += delta
+                else:
+                    key_holds[key] = 0
+                key_holds[key] = max(0, min(5, key_holds[key]))
+            y = vel_curve(key_holds['w']) - vel_curve(key_holds['s'])
+            x = vel_curve(key_holds['d']) - vel_curve(key_holds['a'])
+            z = vel_curve(key_holds['up']) - vel_curve(key_holds['down'])
+            rot = vel_curve(key_holds['e']) - vel_curve(key_holds['q'])
+            tello.set_rc(x, y, z, rot)
+            img = tello.get_frame()
+            if img is not None:
+                img = pg.image.frombuffer(img.tobytes(), img.shape[1::-1], "BGR")
+                display.blit(img, (0, 0))
+                pg.display.flip()
+    tello.close()
+    pg.quit()
