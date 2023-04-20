@@ -8,13 +8,9 @@
 # Notes:
 
 import os
-
 import face_recognition
-
 import pickle
-
 import numpy as np
-
 
 class FaceRecognizer:
   # Precond:
@@ -55,7 +51,7 @@ class FaceRecognizer:
     for encoding in encodings:
       for idx, name in enumerate(names):
         distances[idx] = face_recognition.face_distance(self.encodings[name], encoding).min()
-      if distances.min() > min_dist:
+      if len(self.encodings) == 0 or distances.min() > min_dist:
         idents.append("unknown")
       else:
         idents.append(names[distances.argmax()])
@@ -76,7 +72,8 @@ class FaceRecognizer:
     dirs = []
     # Separate the image directories from files, etc.
     for filename in contents:
-      if not filename.startswith(".") and os.path.isdir(filename) and not os.path.islink(filename):
+      temp = os.path.join(face_dir, filename)
+      if not filename.startswith(".") and os.path.isdir(temp) and not os.path.islink(temp):
         dirs.append(filename)
     # Ge to each directory and encode faces based on the images within.
     for person in dirs:
@@ -93,7 +90,7 @@ class FaceRecognizer:
         location = face_recognition.face_locations(img)
         if len(location) > 0:
           location = location[0]
-          self.encodings[person].append(face_recognition.face_encodings(img, location))
+          self.encodings[person].append(face_recognition.face_encodings(img, [location]))
   
   # Precond:
   #   filename is the path to a file which contains serialized face encodings.

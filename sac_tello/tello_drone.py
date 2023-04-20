@@ -59,7 +59,6 @@ class TelloDrone:
 
         self.receive_state_thread = Thread(target=self.__receive_state)
         self.receive_state_thread.daemon = True
-        self.receive_state_thread.start()
 
         # Connection/Drone Accounting
         self.pos = [0, 0, 0]  # Measured in cm, not in use
@@ -313,6 +312,14 @@ class TelloDrone:
     def get_frame(self):
         return self.last_frame
 
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Returns the resolution of a frame.
+    def get_res(self):
+        return self.frame_width, self.frame_height
+
     # ======================================
     # MANAGEMENT METHODS
     # ======================================
@@ -328,9 +335,10 @@ class TelloDrone:
     #       exceeded.
     def connect(self, attempts=5):
         for _ in range(attempts):
-          res = self.__send("Command")
+          res = self.__send("command")
           if res is not None and res == 'ok':
                 self.connected = True
+                self.receive_state_thread.start()
                 self.stream_on()
                 return True
         return False
@@ -430,14 +438,14 @@ class TelloDrone:
     #   Receives messages from the Tello and logs them.
     def __receive(self):
         while not self.stop:
-        try:
-            response, ip = self.send_channel.recvfrom(1024)
-            response = response.decode('utf-8')
-            response = response.strip()
-            self.log[-1][1] = response.strip()
-        except OSError as exc:
-            if not self.stop:
-                print("Caught exception socket.error : %s" % exc)
+            try:
+                response, ip = self.send_channel.recvfrom(1024)
+                response = response.decode('utf-8')
+                response = response.strip()
+                self.log[-1][1] = response.strip()
+            except OSError as exc:
+                if not self.stop:
+                    print("Caught exception socket.error : %s" % exc)
 
     # Precond:
     #   None.
