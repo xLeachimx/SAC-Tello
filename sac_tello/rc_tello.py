@@ -13,6 +13,8 @@ from threading import Thread
 from time import time, perf_counter
 from datetime import datetime
 import cv2
+import pygame as pg
+from math import log1p
 
 class TelloRC:
     # Precond:
@@ -451,8 +453,6 @@ class TelloRC:
                   print("Caught exception socket.error : %s" % exc)
 
 
-import pygame as pg
-from math import log1p
 class RCFlight:
   def __init__(self):
     self.tello = TelloRC()
@@ -509,11 +509,6 @@ class RCFlight:
 
 
 if __name__ == '__main__':
-    import pygame as pg
-    from time import perf_counter
-    from math import log1p
-    
-    
     def vel_curve(t):
         return 100 * (log1p(t) / log1p(5))
     
