@@ -1,4 +1,4 @@
-# File: TelloCmd.py
+# File: tello_cmd.py
 # Author: Michael Huelsman
 # Copyright: Dr. Michael Andrew Huelsman 2023
 # License: GNU GPLv3
@@ -6,6 +6,31 @@
 # Purpose:
 #   A class and function for managing sending commands to a Tello in a separate process.
 # Notes:
+#   This is intended for use in a multiprocessing capacity.
+#   Start by running tello_command_loop as the target of a Process object.
+#
+#   Two multiprocessing queues are used:
+#       cmd_q: Used by the parent to send commands to the Tello.
+#              Commands should be sent as a single string.
+#       conf_q: Used by the child to send confirmation of completion/failure to parent.
+#               Messages in queue are (boolean, string) pairs.
+#               boolean indicates success/failure, string give setails.
+#
+#   Commands (case insensitive) accepted:
+#       halt: Stops the process and closes the management object.
+#       takeoff: Makes the Tello takeoff.
+#       land: Makes the Tello land.
+#       up <dist>: Moves the Tello up to <dist> cm above ground level.
+#       down <dist>: Moves the Tello down to <dist> cm above ground level.
+#       left <dist>: Moves the Tello left <dist> cm.
+#       right <dist>:  Moves the Tello right <dist> cm.
+#       forward <dist>:  Moves the Tello forward <dist> cm.
+#       backward <dist>:  Moves the Tello backward <dist> cm.
+#       rotates [cw, ccw] <deg>: Rotates the Tello <deg> degrees [cw, ccw].
+#       flip [f, b, l, r]: Flips the drone in a direction ([f, b, l, r]).
+#       move <x> <y> <z> <spd>: Moves the Tello by the given (x, y, z) in cm at speed spd.
+#       stream [on, off]: Turns the Tello video stream [on, off].
+#       emergency: send command to shut down Tello (no confirmation).
 
 import multiprocessing as mp
 from socket import socket, AF_INET, SOCK_DGRAM
@@ -76,6 +101,12 @@ def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
                                    int(cmd[3]),
                                    int(cmd[4]))
                 conf_q.put((res, 'move'))
+            elif cmd[0] == "streamon":
+                res = manager.stream_on()
+                conf_q.put((res, 'stream on'))
+            elif cmd[0] == 'streamoff':
+                res = manager.stream_off()
+                conf_q.put((res, 'stream off'))
             elif cmd[0] == "emergency":
                 manager.emergency()
         except ValueError:
