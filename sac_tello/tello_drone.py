@@ -11,9 +11,104 @@
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
-from time import time
+from time import time, perf_counter
 from datetime import datetime
 import cv2
+import multiprocessing as mp
+
+
+# Precond:
+#   video_addr is a string used to identify where opencv should open the stream from.
+#   queue is a multiprocessing Queue for sending video frames back to the main process.
+#   command_queue is a multiprocessing Queue for sending commands to the stream (used to close.)
+#
+# Postcond:
+#   Runs a stream of video which rtrieves and send frames back to the main process while operating
+#   on a separate process.
+def __stream_video__(video_addr: str, queue: mp.Queue, command_queue: mp.Queue):
+    video_stream = cv2.VideoCapture(video_addr)
+    video_stream.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+    framedelta = 1/video_stream.get(cv2.CAP_PROP_FPS)
+    timer = perf_counter()
+    running = True
+    while running:
+        if (perf_counter() - timer) > framedelta:
+            timer = perf_counter()
+            ret, img = video_stream.read()
+            if ret and not queue.full():
+               queue.put(img, False)
+        if not command_queue.empty():
+            running = False
+    video_stream.release()
+
+# Precond:
+#   state_addr is a (string, int) tuple used to bind a socket for receiving state information.
+#   queue is a multiprocessing Queue for sending state information back to the main process.
+#   command_queue is a multiprocessing Queue for sending commands to the stream (used to close.)
+#
+# Postcond:
+#   Runs a stream of state info which retrieves and send info back to the main process while operating
+#   on a separate process.
+def __stream_state__(state_addr: (str, int), queue: mp.Queue, command_queue: mp.Queue):
+    state_channel = socket(AF_INET, SOCK_DGRAM)
+    state_channel.bind(state_addr)
+    running = True
+    while running:
+        try:
+            response, ip = state_channel.recvfrom(1024)
+            response = response.decode('utf-8')
+            response = response.strip()
+            vals = response.split(';')
+            state = {}
+            for item in vals:
+                if item == '':
+                    continue
+                label, val = item.split(':')
+                state[label] = val
+                if not queue.full():
+                    queue.put(state, False)
+        except OSError as exc:
+            if running:
+                print("Caught exception socket.error : %s" % exc)
+        if not command_queue.empty():
+            running = False
+    state_channel.close()
+
+
+# Precond:
+#   local_addr is a string used to bind a socket.
+#   tello_addr is a string used to send message via a socket to the Tello.
+#   send_queue is a multiprocessing Queue for getting commands to send to the Tello.
+#   rec_queue is a multiprocessing Queue for sending back responses to sent commands.
+#
+# Postcond:
+#   Runs a stream which will send commands a receive responses from a Tello drone while running on as a
+#   separate process.
+def __command_stream__(local_addr: (str, int), tello_addr: (str, int), send_queue: mp.Queue, res_queue: mp.Queue):
+    # Setup channels
+    send_channel = socket(AF_INET, SOCK_DGRAM)
+    send_channel.bind(local_addr)
+    send_channel.settimeout(2)
+    running = True
+    while running:
+        if not send_queue.empty():
+            typ, msg = send_queue.get(True)
+            if typ == 'CLOSE':
+                running = False
+                break
+            try:
+                send_channel.sendto(msg.encode('utf-8'), tello_addr)
+                if typ == 'WAIT':
+                    response, ip = send_channel.recvfrom(1024)
+                    response = response.decode('utf-8')
+                    response = response.strip()
+                    res_queue.put((msg, response), True)
+                else:
+                    res_queue.put((msg, None), True)
+            except OSError as exc:
+                if running:
+                    print("Caught exception socket.error : %s" % exc)
+    send_channel.close()
 
 
 class TelloDrone:
@@ -26,43 +121,37 @@ class TelloDrone:
         # Addresses
         self.local_addr = ('', 8889)
         self.tello_addr = ('192.168.10.1', 8889)
-
-        # Setup channels
-        self.send_channel = socket(AF_INET, SOCK_DGRAM)
-        self.send_channel.bind(self.local_addr)
-
-        # Setup receiving thread
-        self.receive_thread = Thread(target=self.__receive)
-        self.receive_thread.daemon = True
-        self.stop = False
-        self.receive_thread.start()
-
         self.log = []
-        self.MAX_TIME_OUT = 10  # measured in seconds
 
         # Connecting the video
         self.video_connect_str = 'udp://192.168.10.1:11111'
-        self.video_stream = None
-        self.video_thread = Thread(target=self.__receive_video)
-        self.video_thread.daemon = True
-        self.last_frame = None
-        self.stream_active = False
-        self.frame_width = 0
-        self.frame_height = 0
 
         # Connecting to current state information
         self.state_addr = ('192.168.10.1', 8890)
         self.local_state_addr = ('', 8890)
-        self.state_channel = socket(AF_INET, SOCK_DGRAM)
-        self.state_channel.bind(self.local_state_addr)
         self.last_state = None
 
-        self.receive_state_thread = Thread(target=self.__receive_state)
-        self.receive_state_thread.daemon = True
+        # Setup processes
+        # Queues
+        self.frame_queue = mp.Queue()
+        self.cmd_video_queue = mp.Queue()
+        self.state_queue = mp.Queue()
+        self.cmd_state_queue = mp.Queue()
+        self.cmd_send_queue = mp.Queue()
+        self.cmd_res_queue = mp.Queue()
+        # Video Stream
+        video_args = [self.video_connect_str, self.frame_queue, self.cmd_video_queue]
+        self.video_proc = mp.Process(target=__stream_video__, args=video_args)
+        # State Stream
+        state_args = [self.local_state_addr, self.state_queue, self.cmd_state_queue]
+        self.state_proc = mp.Process(target=__stream_state__, args=state_args)
+        # Command Stream
+        cmd_args = [self.local_addr, self.tello_addr, self.cmd_send_queue, self.cmd_res_queue]
+        self.cmd_proc = mp.Process(target=__command_stream__, args=cmd_args)
 
-        # Connection/Drone Accounting
-        self.pos = [0, 0, 0]  # Measured in cm, not in use
-        self.yaw = 0  # The important rotation
+        self.proc_pool = mp.Pool()
+        cv2.HOGDescriptor.ge
+
         self.connected = False
 
     # ======================================
