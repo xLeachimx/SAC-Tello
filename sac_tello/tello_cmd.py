@@ -37,6 +37,7 @@ from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import perf_counter
 from datetime import datetime
+import queue
 
 
 def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
@@ -48,69 +49,73 @@ def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
         return
     running = True
     while running:
-        cmd = str(cmd_q.get()).lower()
-        cmd = cmd.split(' ')
-        # Paring the send commands
         try:
-            if cmd[0] == "halt":
-                running = False
-            elif cmd[0] == "takeoff":
-                res = manager.takeoff()
-                conf_q.put((res, 'takeoff'))
-            elif cmd[0] == "land":
-                res = manager.land()
-                conf_q.put((res, 'land'))
-            elif cmd[0] == "up":
-                res = manager.up(int(cmd[1]))
-                conf_q.put((res, 'up'))
-            elif cmd[0] == "down":
-                res = manager.down(int(cmd[1]))
-                conf_q.put((res, 'down'))
-            elif cmd[0] == "left":
-                res = manager.left(int(cmd[1]))
-                conf_q.put((res, 'left'))
-            elif cmd[0] == "right":
-                res = manager.right(int(cmd[1]))
-                conf_q.put((res, 'right'))
-            elif cmd[0] == "forward":
-                res = manager.forward(int(cmd[1]))
-                conf_q.put((res, 'left'))
-            elif cmd[0] == "backward":
-                res = manager.backward(int(cmd[1]))
-                conf_q.put((res, 'right'))
-            elif cmd[0] == "rotate":
-                res = False
-                if cmd[1] == 'cw':
-                    res = manager.rotate_cw(int(cmd[2]))
-                elif cmd[1] == 'ccw':
-                    res = manager.rotate_ccw(int(cmd[2]))
-                conf_q.put((res, 'rotate ' + cmd[1]))
-            elif cmd[0] == "flip":
-                res = False
-                if cmd[1] == 'f':
-                    res = manager.flip_forward()
-                elif cmd[1] == 'b':
-                    res = manager.flip_backward()
-                elif cmd[1] == 'l':
-                    res = manager.flip_left()
-                elif cmd[1] == 'r':
-                    res = manager.flip_right()
-            elif cmd[0] == "move":
-                res = manager.move(int(cmd[1]),
-                                   int(cmd[2]),
-                                   int(cmd[3]),
-                                   int(cmd[4]))
-                conf_q.put((res, 'move'))
-            elif cmd[0] == "streamon":
-                res = manager.stream_on()
-                conf_q.put((res, 'stream on'))
-            elif cmd[0] == 'streamoff':
-                res = manager.stream_off()
-                conf_q.put((res, 'stream off'))
-            elif cmd[0] == "emergency":
-                manager.emergency()
-        except ValueError:
-            conf_q.put((False, 'Invalid Argument'))
+            cmd = str(cmd_q.get(False)).lower()
+            cmd = cmd.split(' ')
+            # Paring the send commands
+            try:
+                if cmd[0] == "halt":
+                    running = False
+                elif cmd[0] == "takeoff":
+                    res = manager.takeoff()
+                    conf_q.put((res, 'takeoff'))
+                elif cmd[0] == "land":
+                    res = manager.land()
+                    conf_q.put((res, 'land'))
+                elif cmd[0] == "up":
+                    res = manager.up(int(cmd[1]))
+                    conf_q.put((res, 'up'))
+                elif cmd[0] == "down":
+                    res = manager.down(int(cmd[1]))
+                    conf_q.put((res, 'down'))
+                elif cmd[0] == "left":
+                    res = manager.left(int(cmd[1]))
+                    conf_q.put((res, 'left'))
+                elif cmd[0] == "right":
+                    res = manager.right(int(cmd[1]))
+                    conf_q.put((res, 'right'))
+                elif cmd[0] == "forward":
+                    res = manager.forward(int(cmd[1]))
+                    conf_q.put((res, 'forward'))
+                elif cmd[0] == "backward":
+                    res = manager.backward(int(cmd[1]))
+                    conf_q.put((res, 'backward'))
+                elif cmd[0] == "rotate":
+                    res = False
+                    if cmd[1] == 'cw':
+                        res = manager.rotate_cw(int(cmd[2]))
+                    elif cmd[1] == 'ccw':
+                        res = manager.rotate_ccw(int(cmd[2]))
+                    conf_q.put((res, 'rotate ' + cmd[1]))
+                elif cmd[0] == "flip":
+                    res = False
+                    if cmd[1] == 'f':
+                        res = manager.flip_forward()
+                    elif cmd[1] == 'b':
+                        res = manager.flip_backward()
+                    elif cmd[1] == 'l':
+                        res = manager.flip_left()
+                    elif cmd[1] == 'r':
+                        res = manager.flip_right()
+                elif cmd[0] == "move":
+                    res = manager.move(int(cmd[1]),
+                                       int(cmd[2]),
+                                       int(cmd[3]),
+                                       int(cmd[4]))
+                    conf_q.put((res, 'move'))
+                elif cmd[0] == "stream":
+                    if cmd[1] == "on":
+                        res = manager.stream_on()
+                        conf_q.put((res, 'stream on'))
+                    elif cmd[1] == "off":
+                        res = manager.stream_on()
+                        conf_q.put((res, 'stream off'))
+                elif cmd[0] == "emergency":
+                    manager.emergency()
+            except ValueError:
+                conf_q.put((False, 'Invalid Argument'))
+        except queue.Empty:
+            pass
     manager.close()
     
 

@@ -22,6 +22,7 @@ from threading import Thread
 from time import perf_counter
 from datetime import datetime
 import multiprocessing as mp
+import queue
 
 
 def tello_state_loop(halt_q: mp.Queue, state_q: mp.Queue):
@@ -30,9 +31,12 @@ def tello_state_loop(halt_q: mp.Queue, state_q: mp.Queue):
     manager.start()
     running = True
     while running:
-        halt = str(halt_q.get(False))
-        if halt.lower() == 'halt':
-            break
+        try:
+            halt = str(halt_q.get(False))
+            if halt.lower() == 'halt':
+                break
+        except queue.Empty:
+            pass
         state = manager.get()
         if state is not None:
             state_q.put(state)
