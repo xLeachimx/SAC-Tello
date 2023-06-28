@@ -38,6 +38,7 @@ from threading import Thread
 from time import perf_counter
 from datetime import datetime
 import queue
+import os
 
 
 def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
@@ -116,6 +117,12 @@ def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
                 conf_q.put((False, 'Invalid Argument'))
         except queue.Empty:
             pass
+    try:
+        while not cmd_q.empty():
+            cmd_q.get_nowait()
+    except queue.Empty:
+        pass
+    cmd_q.close()
     manager.close()
     
 
@@ -371,17 +378,19 @@ class TelloCmd:
         return res is not None and res =='ok'
     
     # Precond:
-    #   None.
+    #   fldr is a string containing the path to the folder to place the log file.
     #
     # Postcond:
     #   Closes down communication with the drone and writes the log to a file.
-    def close(self):
+    def close(self, fldr: str = "logs"):
         self.connected = False
         self.stop = True
         self.send_channel.close()
         self.receive_thread.join()
         t = datetime.now()
-        log_name = t.strftime("%Y-%m-%d-%X") + '-cmd.log'
+        log_name = os.path.join(fldr, t.strftime("%Y-%m-%d_%H-%M-%S") + '-cmd.log')
+        if not os.path.exists(fldr):
+            os.mkdir(fldr)
         with open(log_name, 'w') as fout:
             count = 0
             for entry in self.log:

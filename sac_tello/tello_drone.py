@@ -91,6 +91,7 @@ class TelloDrone:
         self.state_process.start()
         self.video_thread.start()
         self.video_process.start()
+        return True
 
     # Precond:
     #   None.
@@ -99,16 +100,18 @@ class TelloDrone:
     #   Closes down communication with the drone and writes the log to a file.
     def close(self):
         self.running = False
-        self.cmd_thread.join(2)
-        self.state_thread.join(2)
-        self.video_thread.join(2)
+        self.cmd_thread.join()
+        self.state_thread.join()
+        self.video_thread.join()
         self.video_haltQ.put("halt")
-        self.state_haltQ.put("halt")
+        TelloDrone.__clear_q(self.video_recQ)
         self.video_process.join()
+        self.state_haltQ.put("halt")
+        TelloDrone.__clear_q(self.state_recQ)
         self.state_process.join()
-        sleep(1)
         self.cmdQ.put("halt")
-        self.cmd_process.close()
+        TelloDrone.__clear_q(self.cmd_confQ)
+        self.cmd_process.join()
 
     # ======================================
     # COMMAND METHODS
@@ -319,7 +322,7 @@ class TelloDrone:
     #
     # Postcond:
     #   Returns the last state received from the Tello as a dictionary.
-    def state(self):
+    def get_state(self):
         return self.last_state
 
     # Precond:
@@ -329,7 +332,7 @@ class TelloDrone:
     #   Sends the emergency command, in triplicate. Does not wait for response.
     def emergency(self):
         for _ in range(3):
-            self.commandQ.append("emergency")
+            self.cmdQ.put("emergency")
 
     # ======================================
     # PRIVATE METHODS
@@ -342,7 +345,7 @@ class TelloDrone:
     #   Thread handling command execution.
     def __cmd_thread(self):
         while self.running:
-            if len(self.commandQ) > 0:
+            if len(self.commandQ) > 0 and self.cmdQ.empty():
                 self.cmdQ.put(self.commandQ.pop(0))
                 conf = self.cmd_confQ.get()
                 if not conf[0]:
@@ -365,4 +368,17 @@ class TelloDrone:
     def __video_thread(self):
         while self.running:
             self.last_frame = self.video_recQ.get()
+        
+    # Precond:
+    #   q is a valid mp.Queue object.
+    #
+    # Postcond:
+    #   Clears the q and closes it.
+    def __clear_q(q: mp.Queue):
+        try:
+            while not q.empty():
+                q.get_nowait()
+        except queue.Empty:
+            pass
+        q.close()
         

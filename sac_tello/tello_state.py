@@ -23,6 +23,7 @@ from time import perf_counter
 from datetime import datetime
 import multiprocessing as mp
 import queue
+import os
 
 
 def tello_state_loop(halt_q: mp.Queue, state_q: mp.Queue):
@@ -37,9 +38,16 @@ def tello_state_loop(halt_q: mp.Queue, state_q: mp.Queue):
                 break
         except queue.Empty:
             pass
-        state = manager.get()
-        if state is not None:
-            state_q.put(state)
+        if state_q.empty():
+            state = manager.get()
+            if state is not None:
+                state_q.put(state)
+    try:
+        while not state_q.empty():
+            state_q.get_nowait()
+    except queue.Empty:
+        pass
+    state_q.close()
     manager.close()
     
 
@@ -84,21 +92,23 @@ class TelloState:
         return None
     
     # Precond:
-    #   None.
+    #   fldr is a string containing the path to the folder to place the log file..
     #
     # Postcond:
     #   Closes the threads and various channel.
     #   Writes out log data.
-    def close(self):
+    def close(self, fldr: str = "logs"):
         self.stop = True
         self.state_channel.close()
         self.receive_state_thread.join()
         t = datetime.now()
-        log_name = t.strftime("%Y-%m-%d-%X") + '-state.log'
+        log_name = os.path.join(fldr, t.strftime("%Y-%m-%d_%H-%M-%S") + '-state.log')
+        if not os.path.exists(fldr):
+            os.mkdir(fldr)
         with open(log_name, 'w') as fout:
             for entry in self.state_log:
-                print("Mission Time(s):", round(entry[1], 3))
-                print("State:", entry[0])
+                print("Mission Time(s):", round(entry[1], 3), file=fout)
+                print("State:", entry[0], file=fout)
 
     # Precond:
     #   None.
@@ -118,8 +128,8 @@ class TelloState:
                         continue
                     label, val = item.split(':')
                     state[label] = val
-                    state_time = perf_counter() - self.mission_start
-                    self.state_log.append((state, state_time))
+                state_time = perf_counter() - self.mission_start
+                self.state_log.append((state, state_time))
             except OSError as exc:
                 if not self.stop:
                     print("Caught exception socket.error : %s" % exc)

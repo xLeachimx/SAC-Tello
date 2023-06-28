@@ -23,7 +23,7 @@ import cv2
 import queue
 
 
-def tello_video_loop(halt_q: mp.Queue, state_q: mp.Queue):
+def tello_video_loop(halt_q: mp.Queue, frame_q: mp.Queue):
     # Create a management object.
     manager = TelloVideo()
     manager.start()
@@ -35,9 +35,16 @@ def tello_video_loop(halt_q: mp.Queue, state_q: mp.Queue):
                 break
         except queue.Empty:
             pass
-        frame = manager.get()
-        if frame is not None:
-            state_q.put(frame)
+        if frame_q.empty():
+            frame = manager.get()
+            if frame is not None:
+                frame_q.put(frame)
+    try:
+        while not frame_q.empty():
+            frame_q.get_nowait()
+    except queue.Empty:
+        pass
+    frame_q.close()
     manager.close()
 
 
@@ -45,7 +52,6 @@ def tello_video_loop(halt_q: mp.Queue, state_q: mp.Queue):
 class TelloVideo:
     def __init__(self):
         # Running info
-        self.stop = False
         self.last_frame = None
         self.frame_update = False
 
@@ -55,7 +61,7 @@ class TelloVideo:
         self.video_thread = Thread(target=self.__receive)
         self.video_thread.daemon = True
         self.last_frame = None
-        self.stream_active = False
+        self.stream_active = True
         self.frame_width = 0
         self.frame_height = 0
     
@@ -96,7 +102,6 @@ class TelloVideo:
         self.stream_active = False
         self.video_thread.join()
         self.last_frame = None
-        self.video_stream = None
 
     # Precond:
     #   None.
@@ -104,7 +109,7 @@ class TelloVideo:
     # Postcond:
     #   Receives video messages from the Tello.
     def __receive(self):
-        while not self.stop and self.stream_active:
+        while self.stream_active:
             ret, img = self.video_stream.read()
             if ret:
                 self.last_frame = (img, self.frame_width, self.frame_height)
