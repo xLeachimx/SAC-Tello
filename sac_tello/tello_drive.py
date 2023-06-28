@@ -9,7 +9,8 @@
 
 from tello_drone import TelloDrone
 from threading import Thread
-from tello_hud import hud_stream
+from tello_hud import TelloHud
+from time import sleep
 
 
 def drive_tello():
@@ -17,11 +18,11 @@ def drive_tello():
     if not drone.start():
         print("Problem connecting.")
         return False
-    # video_thread = Thread(target=video_stream, args=(drone,))
-    # video_thread.daemon = True
-    # video_thread.start()
-    # video_thread.join()
-    hud_stream(drone)
+    hud = TelloHud(drone)
+    hud.activate_hud()
+    while hud.is_active():
+        pass
+    hud.deactivate_hud()
     drone.close()
 
     
