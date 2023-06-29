@@ -6,5 +6,8 @@
 # Purpose:
 # Notes:
 
+import os
 from .tello_drone import TelloDrone
 from .tello_hud import TelloHud
+from .tello_rc import TelloRC
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
