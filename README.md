@@ -55,23 +55,24 @@ drone.close()
 
 The following are all commands that can be sent to the Tello:
 
-| Command        | Method        | Arguments                        |
-|----------------|---------------|----------------------------------| 
-| takeoff        | takeoff       | None                             |
-| land           | land          | None                             |
-| up             | up            | distance: int                    |
-| down           | down          | distance: int                    |
-| left           | left          | distance: int                    |
-| right          | right         | distance: int                    |
-| forward        | forward       | distance: int                    |
-| backward       | backward      | distance: int                    |
-| rotate cw      | rotate_cw     | degrees: int                     |
-| rotate ccw     | rotate_ccw    | degrees: int                     |
-| flip left      | flip_left     | None                             |
-| flip right     | flip_right    | None                             |
-| flip forward   | flip_forward  | None                             |
-| flip backward  | flip_backward | None                             |
-| move           | move          | x: int, y: int, z: int, spd: int |
+| Command       | Method        | Arguments                        |
+|---------------|---------------|----------------------------------| 
+| takeoff       | takeoff       | None                             |
+| land          | land          | None                             |
+| up            | up            | distance: int                    |
+| down          | down          | distance: int                    |
+| left          | left          | distance: int                    |
+| right         | right         | distance: int                    |
+| forward       | forward       | distance: int                    |
+| backward      | backward      | distance: int                    |
+| rotate cw     | rotate_cw     | degrees: int                     |
+| rotate ccw    | rotate_ccw    | degrees: int                     |
+| flip left     | flip_left     | None                             |
+| flip right    | flip_right    | None                             |
+| flip forward  | flip_forward  | None                             |
+| flip backward | flip_backward | None                             |
+| move          | move          | x: int, y: int, z: int, spd: int |
+| emergency     | emergency     | None                             |
 
 ## Tello Heads-up Display
 

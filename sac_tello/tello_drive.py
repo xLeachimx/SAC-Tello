@@ -4,7 +4,7 @@
 # License: GNU GPLv3
 # Created On: 27 Jun 2023
 # Purpose:
-#   A program for flying a tello drone from a ground station computer.
+#   A program for testing flying a tello drone from a ground station computer.
 # Notes:
 
 from tello_drone import TelloDrone
@@ -20,8 +20,9 @@ def drive_tello():
         return False
     hud = TelloHud(drone)
     hud.activate_hud()
-    while hud.is_active():
-        pass
+    drone.takeoff()
+    drone.forward(50)
+    drone.land()
     hud.deactivate_hud()
     drone.close()
 

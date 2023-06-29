@@ -20,7 +20,22 @@ class TelloHud:
         self.running = False
         self.hud_thread = Thread(target=self.__hud_stream)
         self.hud_thread.daemon = True
-        
+        # Create base visuals for hud
+        self.hud_rad = 50
+        self.hud_base = pg.Surface((4*self.hud_rad, 4*self.hud_rad), pg.SRCALPHA, 32)
+        hud_center = self.BasicVec(self.hud_base.get_width() // 2, self.hud_base.get_height() // 2)
+        pg.draw.circle(self.hud_base, (0, 0, 0, 100), hud_center.to_tuple(), 2*self.hud_rad)
+        # Draw baselines
+        pg.draw.circle(self.hud_base, (0, 200, 0), hud_center.to_tuple(), self.hud_rad, self.hud_rad // 10)
+        # Roll baseline
+        roll_baseline = self.BasicVec(cos(0), sin(0))
+        roll_start = roll_baseline.scale(self.hud_rad).add(hud_center)
+        roll_end = roll_baseline.scale(2 * self.hud_rad).add(hud_center)
+        pg.draw.line(self.hud_base, (0, 200, 0), roll_start.to_tuple(), roll_end.to_tuple(), 6)
+        roll_start = roll_baseline.neg().scale(self.hud_rad).add(hud_center)
+        roll_end = roll_baseline.neg().scale(2 * self.hud_rad).add(hud_center)
+        pg.draw.line(self.hud_base, (0, 200, 0), roll_start.to_tuple(), roll_end.to_tuple(), 6)
+    
     def activate_hud(self):
         if self.running:
             return
@@ -73,18 +88,8 @@ class TelloHud:
         
     def __artificial_horizon(self, rad: int, pitch:int, roll: int):
         result = pg.surface.Surface((4*rad, 4*rad), pg.SRCALPHA, 32)
-        result.fill((0, 0, 0, 100))
-        center = self.BasicVec(result.get_width()//2, result.get_height()//2)
-        # Draw baselines
-        pg.draw.circle(result, (0, 200, 0), center.to_tuple(), rad, rad//10)
-        # Roll baseline
-        roll_baseline = self.BasicVec(cos(0), sin(0))
-        roll_start = roll_baseline.scale(rad).add(center)
-        roll_end = roll_baseline.scale(2*rad).add(center)
-        pg.draw.line(result, (0, 200, 0), roll_start.to_tuple(), roll_end.to_tuple(), 6)
-        roll_start = roll_baseline.neg().scale(rad).add(center)
-        roll_end = roll_baseline.neg().scale(2 * rad).add(center)
-        pg.draw.line(result, (0, 200, 0), roll_start.to_tuple(), roll_end.to_tuple(), 6)
+        result.blit(self.hud_base, (0, 0))
+        center = self.BasicVec(result.get_width() // 2, result.get_height() // 2)
         # Draw roll lines]
         left_ang = radians(180 + roll)
         left_vec = self.BasicVec(cos(left_ang), sin(left_ang))
@@ -101,7 +106,7 @@ class TelloHud:
         right_end = right_end.add(center)
         pg.draw.line(result, (0, 200, 0), right_start.to_tuple(), right_end.to_tuple(), 3)
         # Draw Pitch lines
-        pitch = -pitch # Line irection adjustment
+        pitch = -pitch # Line direction adjustment
         pitch_line_deg = 10
         pitch_lines = pg.Surface((rad, rad), pg.SRCALPHA)
         pixels_per_ang = 2
@@ -135,7 +140,6 @@ class TelloHud:
             elif type(other) == tuple:
                 return TelloHud.BasicVec(self.x+other[0], self.y+other[1])
             
-        
         def scale(self, n):
             return TelloHud.BasicVec(self.x*n, self.y*n)
         
