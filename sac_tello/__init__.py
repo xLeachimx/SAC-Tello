@@ -10,4 +10,6 @@ import os
 from .tello_drone import TelloDrone
 from .tello_hud import TelloHud
 from .tello_rc import TelloRC
+from .face_encoder import FaceEncoder
+from .tello_face_hud import TelloFaceHud
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"

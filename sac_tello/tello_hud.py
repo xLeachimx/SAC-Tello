@@ -42,7 +42,6 @@ class TelloHud:
             return
         self.running = True
         self.hud_thread.start()
-        sleep(5)
         
     def deactivate_hud(self):
         if not self.running:
