@@ -8,21 +8,20 @@
 # Notes:
 
 from tello_drone import TelloDrone
+from tello_rc import TelloRC
 from threading import Thread
 from tello_hud import TelloHud
 from time import sleep
 
 
 def drive_tello():
-    drone = TelloDrone()
+    drone = TelloRC()
     if not drone.start():
         print("Problem connecting.")
         return False
     hud = TelloHud(drone)
     hud.activate_hud()
-    drone.takeoff()
-    drone.forward(50)
-    drone.land()
+    drone.control()
     hud.deactivate_hud()
     drone.close()
 

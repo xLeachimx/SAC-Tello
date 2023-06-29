@@ -8,14 +8,15 @@
 # Notes:
 
 from tello_drone import TelloDrone
-from time import perf_counter
+from tello_rc import TelloRC
+from time import perf_counter, sleep
 import pygame as pg
 from math import sin, cos, radians
 from threading import Thread
 
 
 class TelloHud:
-    def __init__(self, drone: TelloDrone):
+    def __init__(self, drone: TelloDrone | TelloRC):
         self.drone = drone
         self.running = False
         self.hud_thread = Thread(target=self.__hud_stream)
@@ -41,6 +42,7 @@ class TelloHud:
             return
         self.running = True
         self.hud_thread.start()
+        sleep(5)
         
     def deactivate_hud(self):
         if not self.running:
@@ -61,7 +63,7 @@ class TelloHud:
         hud_font = pg.font.Font(pg.font.get_default_font(), 20)
         # Setup video loop basics
         frame_timer = perf_counter()
-        frame_delta = 1/30
+        frame_delta = 1/24
         while self.running:
             if (perf_counter() - frame_timer) > frame_delta:
                 frame_timer = perf_counter()
@@ -81,9 +83,8 @@ class TelloHud:
                     horizon_pos = (screen.get_width() - horizon.get_width())//2, (screen.get_height() - horizon.get_height())//2
                     screen.blit(horizon, horizon_pos)
                 pg.display.flip()
-                for event in pg.event.get():
-                    if event.type == pg.QUIT:
-                        self.running = False
+                for event in pg.event.get(pg.QUIT):
+                    self.running = False
         pg.display.quit()
         
     def __artificial_horizon(self, rad: int, pitch:int, roll: int):

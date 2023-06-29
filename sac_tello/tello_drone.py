@@ -112,6 +112,15 @@ class TelloDrone:
         self.cmdQ.put("halt")
         TelloDrone.__clear_q(self.cmd_confQ)
         self.cmd_process.join()
+        
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Waits until all commands are complete.
+    def complete(self):
+        while len(self.commandQ) > 0:
+            sleep(1)
 
     # ======================================
     # COMMAND METHODS

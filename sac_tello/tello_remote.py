@@ -10,6 +10,7 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import perf_counter
+import queue
 from datetime import datetime
 import multiprocessing as mp
 import os
@@ -24,6 +25,23 @@ def tello_remote_loop(rc_q: mp.Queue, conf_q: mp.Queue):
         return
     running = True
     while running:
+        # Grab from the rcQ
+        current = rc_q.get()
+        if type(current) == str:
+            if current == "halt":
+                running = False
+            elif current == "takeoff":
+                manager.takeoff()
+            elif current == "land":
+                manager.land()
+            elif current == "emergency":
+                manager.emergency()
+        elif type(current) == tuple:
+            manager.set_rc(*current)
+    try:
+        while not rc_q.empty():
+            rc_q.get_nowait()
+    except queue.Empty:
         pass
     rc_q.close()
     manager.close()
@@ -63,6 +81,7 @@ class TelloRemote:
         self.receive_thread.start()
         self.rc_beat_thread.start()
         if self.__connect(5):
+            self.stream_on()
             return True
         return False
     
@@ -232,26 +251,15 @@ class TelloRemote:
         return res is not None and res == 'ok'
     
     # Precond:
-    #   fldr is a string containing the path to the folder to place the log file.
+    #   None.
     #
     # Postcond:
     #   Closes down communication with the drone and writes the log to a file.
-    def close(self, fldr: str = "logs"):
-        self.connected = False
+    def close(self):
         self.stop = True
         self.send_channel.close()
         self.receive_thread.join()
-        self.rc_beat_thread.start()
-        t = datetime.now()
-        log_name = os.path.join(fldr, t.strftime("%Y-%m-%d_%H-%M-%S") + '-cmd.log')
-        if not os.path.exists(fldr):
-            os.mkdir(fldr)
-        with open(log_name, 'w') as fout:
-            count = 0
-            for entry in self.log:
-                print("Message[" + str(count) + "]:", entry[0], file=fout)
-                print("Response[" + str(count) + "]:", entry[1], file=fout)
-                count += 1
+        self.rc_beat_thread.join()
     
     # ======================================
     # PRIVATE METHODS
