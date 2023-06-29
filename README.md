@@ -107,6 +107,65 @@ closed at anytime by pressing the `X` in the upper right-hand corner.
 Note: Before the HUD is activated nothing will happen. Once the HUD is
 active you will need to deactivate before your program ends.
 
+## Tello Face Detection
+
+Another feature provided by SAC-Tello is access to face recognition via the
+tello's camera. In order to access the face recognition we must first make
+a `FaceEncoder` object. `FaceEncoder` objects take images and names and log
+a person's facial characteristics for later comparison. To register a face
+with the encoder we need to call the `encode_face` method and give it a name
+and the filename of a image containing that person's face. For example:
+
+```python
+from SAC_Tello import FaceEncoder
+face_encoder = FaceEncoder()
+face_encoder.encode_face("Jim", "jim_selfie.jpg")
+```
+
+Once we have given all the faces we want to recognize to the `FaceEncoder`
+object we can pass in the current camera frame from the tello drone. The
+example below simply lists out the names of all people detected by the drone.
+```python
+from SAC_Tello import FaceEncoder
+from SAC_Tello import TelloDrone
+face_encoder = FaceEncoder()
+face_encoder.encode_face("Jim", "jim_selfie.jpg")
+drone = TelloDrone()
+drone.start()
+while drone.get_frame() is None:
+    pass
+faces = face_encoder.detect_faces(drone.get_frame())
+for name, frame_location in faces:
+    print(name, "is in the frame.")
+drone.close()
+```
+
+Of course this only looks at the first frame from the camera. To make it easier
+to see the face recognition in action SAC-Tello provides a face recognition
+version of the heads-up display. This is contained in the `TelloFaceHud` class
+and works similarly to the `TelloHud` class. For example the following code
+will allow for RC control of the Tello while streaming video that recognizes
+faces and displays names:
+
+```python
+from SAC_Tello import FaceEncoder
+from SAC_Tello import TelloRC
+from SAC_Tello import TelloFaceHud
+face_encoder = FaceEncoder()
+face_encoder.encode_face("Jim", "jim_selfie.jpg")
+drone = TelloRC()
+hud = TelloFaceHud(drone, face_encoder)
+hud.activate_hud()
+drone.control()
+hud.deactivate_hud()
+drone.close()
+```
+
+Note: It may take a long time to encode all faces and so you should encode
+faces first, then use them. If a `FaceEncoder` object detects a face it does
+not recognize it will attribute the name `unknown` to it. Face recongition
+in this package not entirely reliable and results may vary.
+
 ## Tello Remote Control
 
 SAC-Tello also comes with a class for using a ground station computer as

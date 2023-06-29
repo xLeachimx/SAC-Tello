@@ -9,7 +9,7 @@
 from tello_drone import TelloDrone
 from tello_rc import TelloRC
 from face_encoder import FaceEncoder
-from time import perf_counter, sleep
+from time import perf_counter
 import pygame as pg
 from threading import Thread
 
