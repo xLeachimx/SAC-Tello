@@ -10,8 +10,8 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import perf_counter
+from datetime import datetime
 import multiprocessing as mp
-import datetime
 import os
 
 
@@ -47,8 +47,8 @@ class TelloRemote:
         self.receive_thread.daemon = True
         
         # Setup rc "hearbeat" thread
-        self.re_beat_thread = Thread(target=self.__rc_beat)
-        self.re_beat_thread.daemon = True
+        self.rc_beat_thread = Thread(target=self.__rc_beat)
+        self.rc_beat_thread.daemon = True
     
         # Setup logs
         self.log = []
@@ -61,7 +61,7 @@ class TelloRemote:
     def startup(self):
         self.stop = False
         self.receive_thread.start()
-        self.re_beat_thread.start()
+        self.rc_beat_thread.start()
         if self.__connect(5):
             return True
         return False
@@ -241,6 +241,7 @@ class TelloRemote:
         self.stop = True
         self.send_channel.close()
         self.receive_thread.join()
+        self.rc_beat_thread.start()
         t = datetime.now()
         log_name = os.path.join(fldr, t.strftime("%Y-%m-%d_%H-%M-%S") + '-cmd.log')
         if not os.path.exists(fldr):
@@ -337,6 +338,7 @@ class TelloRemote:
     # Postcond:
     #   Sends RC messages to the tello based on internal throttle numbers.
     def __rc_beat(self):
-        if (perf_counter() - self.last_beat) > self.rc_tick and not self.waiting:
-            cmd = 'rc ' + ' '.join(map(str, self.rc))
-            self.__send_nowait(cmd)
+        while not self.stop:
+            if (perf_counter() - self.last_beat) > self.rc_tick and not self.waiting:
+                cmd = 'rc ' + ' '.join(map(str, self.rc))
+                self.__send_nowait(cmd)
