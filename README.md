@@ -41,7 +41,8 @@ sets up everything that needs to be in place **before** a connection is made.
 
 To connect to the Tello, the TelloDrone class has a method called `start()`
 once the Tello is connected **remember** to call the `close()` method when
-done.
+done. The `start()` method returns `True` if the connection worked and `False`
+if not.
 
 For example a simple takeoff and land program looks like this:
 ```python
@@ -50,6 +51,7 @@ drone = TelloDrone()
 drone.start()
 drone.takeoff()
 drone.land()
+drone.complete()
 drone.close()
 ```
 
@@ -74,6 +76,10 @@ The following are all commands that can be sent to the Tello:
 | move          | move          | x: int, y: int, z: int, spd: int |
 | emergency     | emergency     | None                             |
 
+Commands are run in parallel and put into a queue for execution. In order
+to complete the remaining commands in the queue, simply call the `complete()`
+method of the TelloDrone object.
+
 ## Tello Heads-up Display
 
 As an additional feature SAC-Tello gives access to a near-real time video
@@ -81,7 +87,7 @@ stream while the Tello is connected. To make this stream more useful a
 HUD was added. This HUD shows the following:
 - Current Battery life
 - Current Time-of-Flight sensor reading
-- Artificial Horizon indicating changes in pitch rnd roll
+- Artificial Horizon indicating changes in pitch and roll
 
 To use the HUD simply import and create a `TelloDrone` object and link it
 with a `TelloHud` object:
@@ -100,3 +106,41 @@ closed at anytime by pressing the `X` in the upper right-hand corner.
 
 Note: Before the HUD is activated nothing will happen. Once the HUD is
 active you will need to deactivate before your program ends.
+
+## Tello Remote Control
+
+SAC-Tello also comes with a class for using a ground station computer as
+a remote control for the tello. This remote control can be combined with
+the `TelloHud` class just like the `TelloDrone` class, but we will skip that
+here.
+
+To create and use the remote control simply include the following in your
+program:
+```python
+from SAC_Tello import TelloRC
+drone = TelloRC()
+drone.start()
+drone.control()
+drone.close()
+```
+
+The `control()` method begins polling loop for keyboard input. The controls
+are as follows:
+
+| Key Press  | Effect                |
+|------------|-----------------------|
+| T          | Takeoff               |
+| L          | Land                  |
+| ESCAPE     | Emergency Kill Switch | 
+| BACKSPACE  | End Remote Control    |
+
+| Key Held    | Effect                      |
+|-------------|-----------------------------|
+| W           | Increase Forward Velocity   |
+| A           | Increase Leftward Velocity  |
+| S           | Increase Backward Velocity  |
+| D           | Increase Rightward Velocity |
+| Q           | Rotate Counterclockwise     |
+| E           | Rotate Clockwise            |
+| Up Arrow    | Increase Hover Height       |
+| Down Arrow  | Decrease Hover Height       |
