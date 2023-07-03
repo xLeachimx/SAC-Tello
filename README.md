@@ -14,7 +14,7 @@ A simple library for controlling a DJI Tello Drone. Built for educational use.
 ### Install
 SAC-Tello can be install by running the following command:
 ```commandline
-python3 -m pip install SAC-Tell0
+python3 -m pip install SAC-Tello
 ```
 for MacOS/Linux
 
@@ -186,20 +186,21 @@ drone.close()
 The `control()` method begins polling loop for keyboard input. The controls
 are as follows:
 
-| Key Press  | Effect                |
-|------------|-----------------------|
-| T          | Takeoff               |
-| L          | Land                  |
-| ESCAPE     | Emergency Kill Switch | 
-| BACKSPACE  | End Remote Control    |
+| Key Press | Effect                |
+|-----------|-----------------------|
+| T         | Takeoff               |
+| L         | Land                  |
+| ESCAPE    | Emergency Kill Switch | 
+| BACKSPACE | End Remote Control    |
+| DELETE    | Zero Velocity         |
 
-| Key Held    | Effect                      |
-|-------------|-----------------------------|
-| W           | Increase Forward Velocity   |
-| A           | Increase Leftward Velocity  |
-| S           | Increase Backward Velocity  |
-| D           | Increase Rightward Velocity |
-| Q           | Rotate Counterclockwise     |
-| E           | Rotate Clockwise            |
-| Up Arrow    | Increase Hover Height       |
-| Down Arrow  | Decrease Hover Height       |
+| Key Held | Effect                      |
+|----------|-----------------------------|
+| W        | Increase Forward Velocity   |
+| A        | Increase Leftward Velocity  |
+| S        | Increase Backward Velocity  |
+| D        | Increase Rightward Velocity |
+| Q        | Rotate Counterclockwise     |
+| E        | Rotate Clockwise            |
+| R        | Increase Hover Height       |
+| F        | Decrease Hover Height       |

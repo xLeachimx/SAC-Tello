@@ -7,10 +7,10 @@
 #   A program for testing flying a tello drone from a ground station computer.
 # Notes:
 
-from tello_drone import TelloDrone
-from tello_rc import TelloRC
+from .tello_drone import TelloDrone
+from .tello_rc import TelloRC
 from threading import Thread
-from tello_hud import TelloHud
+from .tello_hud import TelloHud
 from time import sleep
 
 
