@@ -106,18 +106,24 @@ class TelloDrone:
     #   Closes down communication with the drone and writes the log to a file.
     def close(self):
         self.running = False
-        self.cmd_thread.join()
-        self.state_thread.join()
-        self.video_thread.join()
-        self.video_haltQ.put("halt")
-        TelloDrone.__clear_q(self.video_recQ)
-        self.video_process.join()
-        self.state_haltQ.put("halt")
-        TelloDrone.__clear_q(self.state_recQ)
-        self.state_process.join()
-        self.cmdQ.put("halt")
-        TelloDrone.__clear_q(self.cmd_confQ)
-        self.cmd_process.join()
+        if self.cmd_thread.is_alive():
+            self.cmd_thread.join()
+        if self.state_thread.is_alive():
+            self.state_thread.join()
+        if self.video_thread.is_alive():
+            self.video_thread.join()
+        if self.video_process.is_alive():
+            self.video_haltQ.put("halt")
+            TelloDrone.__clear_q(self.video_recQ)
+            self.video_process.join()
+        if self.state_process.is_alive():
+            self.state_haltQ.put("halt")
+            TelloDrone.__clear_q(self.state_recQ)
+            self.state_process.join()
+        if self.cmd_process.is_alive():
+            self.cmdQ.put("halt")
+            TelloDrone.__clear_q(self.cmd_confQ)
+            self.cmd_process.join()
         
     # Precond:
     #   None.
@@ -396,4 +402,7 @@ class TelloDrone:
         except queue.Empty:
             pass
         q.close()
-        
+
+
+if __name__ == '__main__':
+    mp.freeze_support()

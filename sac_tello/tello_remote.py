@@ -358,3 +358,6 @@ class TelloRemote:
             if (perf_counter() - self.last_beat) > self.rc_tick and not self.waiting:
                 cmd = 'rc ' + ' '.join(map(str, self.rc))
                 self.__send_nowait(cmd)
+                
+if __name__ == '__main__':
+    mp.freeze_support()

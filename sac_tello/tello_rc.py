@@ -149,17 +149,22 @@ class TelloRC:
     #   Closes down communication with the drone and writes the log to a file.
     def close(self):
         self.running = False
-        self.state_thread.join()
-        self.video_thread.join()
-        self.video_haltQ.put("halt")
-        TelloRC.__clear_q(self.video_recQ)
-        self.video_process.join()
-        self.state_haltQ.put("halt")
-        TelloRC.__clear_q(self.state_recQ)
-        self.state_process.join()
-        self.rcQ.put("halt")
-        TelloRC.__clear_q(self.rc_confQ)
-        self.rc_process.join()
+        if self.state_thread.is_alive():
+            self.state_thread.join()
+        if self.video_thread.is_alive():
+            self.video_thread.join()
+        if self.video_process.is_alive():
+            self.video_haltQ.put("halt")
+            TelloRC.__clear_q(self.video_recQ)
+            self.video_process.join()
+        if self.state_process.is_alive():
+            self.state_haltQ.put("halt")
+            TelloRC.__clear_q(self.state_recQ)
+            self.state_process.join()
+        if self.rc_process.is_alive():
+            self.rcQ.put("halt")
+            TelloRC.__clear_q(self.rc_confQ)
+            self.rc_process.join()
 
     # ======================================
     # COMMAND METHODS
@@ -337,3 +342,7 @@ class TelloRC:
     #   Returns the current velocity based on how long a key has  been pressed.
     def __vel_curve(self, t):
         return 100 * (log1p(t) / log1p(self.vel_timing))
+
+
+if __name__ == '__main__':
+    mp.freeze_support()

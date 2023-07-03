@@ -130,4 +130,3 @@ class TelloHud:
         pg.draw.line(pitch_lines, (0, 0, 200), (0, indicator_height), (pitch_lines.get_width(), indicator_height), 3)
         result.blit(pitch_lines, center_pitch)
         return result
-    
