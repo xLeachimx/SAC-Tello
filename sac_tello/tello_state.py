@@ -134,3 +134,7 @@ class TelloState:
                 if not self.stop:
                     print("Caught exception socket.error : %s" % exc)
                     
+                    
+if __name__ == '__main__':
+    mp.freeze_support()
+    

@@ -16,9 +16,9 @@ import pygame as pg
 import sys
 from threading import Thread
 
-from tello_remote import tello_remote_loop
-from tello_state import tello_state_loop
-from tello_video import tello_video_loop
+from .tello_remote import tello_remote_loop
+from .tello_state import tello_state_loop
+from .tello_video import tello_video_loop
 
 
 class TelloRC:
@@ -32,25 +32,30 @@ class TelloRC:
         self.rcQ = mp.Queue()
         self.rc_confQ = mp.Queue()
         self.rc_process = mp.Process(target=tello_remote_loop, args=(self.rcQ, self.rc_confQ))
+        self.rc_process.daemon = True
         
         # Setup state process
         self.state_haltQ = mp.Queue()
         self.state_recQ = mp.Queue()
         self.state_process = mp.Process(target=tello_state_loop, args=(self.state_haltQ, self.state_recQ))
+        self.state_process.daemon = True
         self.state_thread = Thread(target=self.__state_thread)
+        self.state_thread.daemon = True
         
         # Setup video process
         self.video_haltQ = mp.Queue()
         self.video_recQ = mp.Queue()
         self.video_process = mp.Process(target=tello_video_loop, args=(self.video_haltQ, self.video_recQ))
+        self.video_process.daemon = True
         self.video_thread = Thread(target=self.__video_thread)
+        self.video_thread.daemon = True
         
         # Internal variables
         self.current_rc = [0, 0, 0, 0]
         self.last_state = None
         self.last_frame = None
         self.running = False
-        self.vel_timing = 5
+        self.vel_timing = 10
 
     # ==========================
     #   MANAGEMENT METHODS
@@ -75,9 +80,9 @@ class TelloRC:
     
     def control(self):
         # Setup
-        key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'up': 0, 'down': 0}
+        key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'r': 0, 'f': 0}
         poll_timer = perf_counter()
-        poll_delta = 1/16
+        poll_delta = 1/30
         # Main Loop
         control_running = True
         pg.init()
@@ -101,6 +106,24 @@ class TelloRC:
                             print("Problem with emergency shutdown!")
                     elif event.key == pg.K_BACKSPACE:
                         control_running = False
+                    elif event.key == pg.K_DELETE:
+                        self.rcQ.put((0, 0, 0, 0))
+                    elif event.key == pg.K_UP:
+                        command_sent = True
+                        if not self.flip_forward():
+                            print("Problem with forward flip!")
+                    elif event.key == pg.K_DOWN:
+                        command_sent = True
+                        if not self.flip_backward():
+                            print("Problem with backward flip!")
+                    elif event.key == pg.K_RIGHT:
+                        command_sent = True
+                        if not self.flip_right():
+                            print("Problem with right flip!")
+                    elif event.key == pg.K_LEFT:
+                        command_sent = True
+                        if not self.flip_left():
+                            print("Problem with left flip!")
                 if command_sent:
                     poll_timer = perf_counter()
                     continue
@@ -114,7 +137,7 @@ class TelloRC:
                     key_holds[key] = max(0, min(self.vel_timing, key_holds[key]))
                 y = self.__vel_curve(key_holds['w']) - self.__vel_curve(key_holds['s'])
                 x = self.__vel_curve(key_holds['d']) - self.__vel_curve(key_holds['a'])
-                z = self.__vel_curve(key_holds['up']) - self.__vel_curve(key_holds['down'])
+                z = self.__vel_curve(key_holds['r']) - self.__vel_curve(key_holds['f'])
                 rot = self.__vel_curve(key_holds['e']) - self.__vel_curve(key_holds['q'])
                 if self.rcQ.empty():
                     self.rcQ.put((int(x), int(y), int(z), int(rot)))
@@ -126,17 +149,22 @@ class TelloRC:
     #   Closes down communication with the drone and writes the log to a file.
     def close(self):
         self.running = False
-        self.state_thread.join()
-        self.video_thread.join()
-        self.video_haltQ.put("halt")
-        TelloRC.__clear_q(self.video_recQ)
-        self.video_process.join()
-        self.state_haltQ.put("halt")
-        TelloRC.__clear_q(self.state_recQ)
-        self.state_process.join()
-        self.rcQ.put("halt")
-        TelloRC.__clear_q(self.rc_confQ)
-        self.rc_process.join()
+        if self.state_thread.is_alive():
+            self.state_thread.join()
+        if self.video_thread.is_alive():
+            self.video_thread.join()
+        if self.video_process.is_alive():
+            self.video_haltQ.put("halt")
+            TelloRC.__clear_q(self.video_recQ)
+            self.video_process.join()
+        if self.state_process.is_alive():
+            self.state_haltQ.put("halt")
+            TelloRC.__clear_q(self.state_recQ)
+            self.state_process.join()
+        if self.rc_process.is_alive():
+            self.rcQ.put("halt")
+            TelloRC.__clear_q(self.rc_confQ)
+            self.rc_process.join()
 
     # ======================================
     # COMMAND METHODS
@@ -183,6 +211,66 @@ class TelloRC:
     #   Sends the emergency command, in triplicate. Does not wait for response.
     def emergency(self):
         self.rcQ.put("emergency")
+        try:
+            conf = self.rc_confQ.get(block=True, timeout=5)
+            if not conf[0]:
+                return False
+        except queue.Empty:
+            return False
+        return True
+
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Adds flip l command to the command queue.
+    def flip_left(self):
+        self.rcQ.put("flip l")
+        try:
+            conf = self.rc_confQ.get(block=True, timeout=5)
+            if not conf[0]:
+                return False
+        except queue.Empty:
+            return False
+        return True
+
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Adds flip r command to the command queue.
+    def flip_right(self):
+        self.rcQ.put("flip r")
+        try:
+            conf = self.rc_confQ.get(block=True, timeout=5)
+            if not conf[0]:
+                return False
+        except queue.Empty:
+            return False
+        return True
+
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Adds flip f command to the command queue.
+    def flip_forward(self):
+        self.rcQ.put("flip f")
+        try:
+            conf = self.rc_confQ.get(block=True, timeout=5)
+            if not conf[0]:
+                return False
+        except queue.Empty:
+            return False
+        return True
+
+    # Precond:
+    #   None.
+    #
+    # Postcond:
+    #   Adds flip b command to the command queue.
+    def flip_backward(self):
+        self.rcQ.put("flip b")
         try:
             conf = self.rc_confQ.get(block=True, timeout=5)
             if not conf[0]:
@@ -254,3 +342,7 @@ class TelloRC:
     #   Returns the current velocity based on how long a key has  been pressed.
     def __vel_curve(self, t):
         return 100 * (log1p(t) / log1p(self.vel_timing))
+
+
+if __name__ == '__main__':
+    mp.freeze_support()

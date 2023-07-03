@@ -36,6 +36,14 @@ def tello_remote_loop(rc_q: mp.Queue, conf_q: mp.Queue):
                 manager.land()
             elif current == "emergency":
                 manager.emergency()
+            elif current == "flip f":
+                manager.flip_forward()
+            elif current == "flip b":
+                manager.flip_backward()
+            elif current == "flip r":
+                manager.flip_right()
+            elif current == "flip l":
+                manager.flip_left()
         elif type(current) == tuple:
             manager.set_rc(*current)
     try:
@@ -350,3 +358,6 @@ class TelloRemote:
             if (perf_counter() - self.last_beat) > self.rc_tick and not self.waiting:
                 cmd = 'rc ' + ' '.join(map(str, self.rc))
                 self.__send_nowait(cmd)
+                
+if __name__ == '__main__':
+    mp.freeze_support()

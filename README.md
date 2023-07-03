@@ -12,9 +12,9 @@ A simple library for controlling a DJI Tello Drone. Built for educational use.
 > pygame>=2.2.0
 
 ### Install
-SAC-Tello can be install by running the following command:
+SAC-Tello can be installed by running the following command:
 ```commandline
-python3 -m pip install SAC-Tell0
+python3 -m pip install SAC-Tello
 ```
 for MacOS/Linux
 
@@ -26,6 +26,10 @@ for Windows
 
 # How To Use
 
+Since this package spawns multiple child processes any use of the package must originate from
+a protected starting point (i.e. `if __name__ == __main__:`) or else a Runtime Error **will**
+occur.
+
 ## Tello Drone
 
 The primary interface for the drone is the TelloDrone class.
@@ -33,7 +37,8 @@ The primary interface for the drone is the TelloDrone class.
 Creating a TelloDrone object is a simple as the following:
 ```python
 from SAC_Tello import TelloDrone
-drone = TelloDrone()
+if __name__ == '__main__':
+    drone = TelloDrone()
 ``` 
 
 A created drone object does **not** connect to the tello drone. This merely
@@ -47,12 +52,13 @@ if not.
 For example a simple takeoff and land program looks like this:
 ```python
 from SAC_Tello import TelloDrone
-drone = TelloDrone()
-drone.start()
-drone.takeoff()
-drone.land()
-drone.complete()
-drone.close()
+if __name__ == '__main__':
+    drone = TelloDrone()
+    drone.start()
+    drone.takeoff()
+    drone.land()
+    drone.complete()
+    drone.close()
 ```
 
 The following are all commands that can be sent to the Tello:
@@ -93,12 +99,13 @@ To use the HUD simply import and create a `TelloDrone` object and link it
 with a `TelloHud` object:
 ```python
 from SAC_Tello import TelloDrone, TelloHud
-drone = TelloDrone()
-hud = TelloHud(drone)
-drone.start()
-hud.activate_hud()
-hud.deactivate_hud()
-drone.close()
+if __name__ == '__main__':
+    drone = TelloDrone()
+    hud = TelloHud(drone)
+    drone.start()
+    hud.activate_hud()
+    hud.deactivate_hud()
+    drone.close()
 ```
 
 The HUD will launch a separate window when activated. This window can be
@@ -118,8 +125,9 @@ and the filename of a image containing that person's face. For example:
 
 ```python
 from SAC_Tello import FaceEncoder
-face_encoder = FaceEncoder()
-face_encoder.encode_face("Jim", "jim_selfie.jpg")
+if __name__ == '__main__':
+    face_encoder = FaceEncoder()
+    face_encoder.encode_face("Jim", "jim_selfie.jpg")
 ```
 
 Once we have given all the faces we want to recognize to the `FaceEncoder`
@@ -128,16 +136,17 @@ example below simply lists out the names of all people detected by the drone.
 ```python
 from SAC_Tello import FaceEncoder
 from SAC_Tello import TelloDrone
-face_encoder = FaceEncoder()
-face_encoder.encode_face("Jim", "jim_selfie.jpg")
-drone = TelloDrone()
-drone.start()
-while drone.get_frame() is None:
-    pass
-faces = face_encoder.detect_faces(drone.get_frame())
-for name, frame_location in faces:
-    print(name, "is in the frame.")
-drone.close()
+if __name__ == '__main__':
+    face_encoder = FaceEncoder()
+    face_encoder.encode_face("Jim", "jim_selfie.jpg")
+    drone = TelloDrone()
+    drone.start()
+    while drone.get_frame() is None:
+        pass
+    faces = face_encoder.detect_faces(drone.get_frame())
+    for name, frame_location in faces:
+        print(name, "is in the frame.")
+    drone.close()
 ```
 
 Of course this only looks at the first frame from the camera. To make it easier
@@ -151,14 +160,15 @@ faces and displays names:
 from SAC_Tello import FaceEncoder
 from SAC_Tello import TelloRC
 from SAC_Tello import TelloFaceHud
-face_encoder = FaceEncoder()
-face_encoder.encode_face("Jim", "jim_selfie.jpg")
-drone = TelloRC()
-hud = TelloFaceHud(drone, face_encoder)
-hud.activate_hud()
-drone.control()
-hud.deactivate_hud()
-drone.close()
+if __name__ == '__main__':
+    face_encoder = FaceEncoder()
+    face_encoder.encode_face("Jim", "jim_selfie.jpg")
+    drone = TelloRC()
+    hud = TelloFaceHud(drone, face_encoder)
+    hud.activate_hud()
+    drone.control()
+    hud.deactivate_hud()
+    drone.close()
 ```
 
 Note: It may take a long time to encode all faces and so you should encode
@@ -177,29 +187,31 @@ To create and use the remote control simply include the following in your
 program:
 ```python
 from SAC_Tello import TelloRC
-drone = TelloRC()
-drone.start()
-drone.control()
-drone.close()
+if __name__ == '__main__':
+    drone = TelloRC()
+    drone.start()
+    drone.control()
+    drone.close()
 ```
 
 The `control()` method begins polling loop for keyboard input. The controls
 are as follows:
 
-| Key Press  | Effect                |
-|------------|-----------------------|
-| T          | Takeoff               |
-| L          | Land                  |
-| ESCAPE     | Emergency Kill Switch | 
-| BACKSPACE  | End Remote Control    |
+| Key Press | Effect                |
+|-----------|-----------------------|
+| T         | Takeoff               |
+| L         | Land                  |
+| ESCAPE    | Emergency Kill Switch | 
+| BACKSPACE | End Remote Control    |
+| DELETE    | Zero Velocity         |
 
-| Key Held    | Effect                      |
-|-------------|-----------------------------|
-| W           | Increase Forward Velocity   |
-| A           | Increase Leftward Velocity  |
-| S           | Increase Backward Velocity  |
-| D           | Increase Rightward Velocity |
-| Q           | Rotate Counterclockwise     |
-| E           | Rotate Clockwise            |
-| Up Arrow    | Increase Hover Height       |
-| Down Arrow  | Decrease Hover Height       |
+| Key Held | Effect                      |
+|----------|-----------------------------|
+| W        | Increase Forward Velocity   |
+| A        | Increase Leftward Velocity  |
+| S        | Increase Backward Velocity  |
+| D        | Increase Rightward Velocity |
+| Q        | Rotate Counterclockwise     |
+| E        | Rotate Clockwise            |
+| R        | Increase Hover Height       |
+| F        | Decrease Hover Height       |

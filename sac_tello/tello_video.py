@@ -116,3 +116,8 @@ class TelloVideo:
                 self.frame_update = True
         self.video_stream.release()
         cv2.destroyAllWindows()
+        
+        
+if __name__ == '__main__':
+    mp.freeze_support()
+    

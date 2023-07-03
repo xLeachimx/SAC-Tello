@@ -9,7 +9,7 @@
 
 import pickle
 import numpy as np
-import face_recognition
+from face_recognition import face_encodings, face_locations, face_distance
 import cv2
 
 
@@ -21,6 +21,8 @@ class FaceEncoder:
     #   Creates a new FaceEncoder object loaded with encodings from a given file.
     def __init__(self, load_file=None):
         self.encodings = {}
+        # Speed upgrades
+        self.encode_scale = 1 / 4
         if load_file is not None:
             self.load(load_file)
 
@@ -34,12 +36,13 @@ class FaceEncoder:
     #   Returns False if no face was found.
     def encode_face(self, name, img_file):
         img = cv2.imread(img_file)
+        img = cv2.resize(img, (640*self.encode_scale, 480*self.encode_scale))
         if name not in self.encodings:
             self.encodings[name] = []
-        location = face_recognition.face_locations(img)
+        location = face_locations(img)
         if len(location) > 0:
             location = location[0]
-            encoding = face_recognition.face_encodings(img, location)[0]
+            encoding = face_encodings(img, location)[0]
             self.encodings[name].append(encoding)
             return True
         return False
@@ -53,18 +56,19 @@ class FaceEncoder:
     #   If no face matches within the specified distance, then it is labeled Unknown.
     #   Returned tuples are (name, location)
     def detect_faces(self, img, min_dist=0.6):
-        locations = face_recognition.face_locations(img)
-        encodings = face_recognition.face_encodings(img, locations)
+        img = cv2.resize(img, (640 * self.encode_scale, 480 * self.encode_scale))
+        locations = face_locations(img)
+        encodings = face_encodings(img, locations)
         names = list(self.encodings.keys())
         distances = np.ones(len(names))
         idents = []
         for encoding in encodings:
             for idx, name in enumerate(names):
-                distances[idx] = face_recognition.face_distance(self.encodings[name], encoding).min()
+                distances[idx] = face_distance(self.encodings[name], encoding).min()
             if distances.min() > min_dist:
                 idents.append("unknown")
             else:
-                idents.append(names[distances.argmax()])
+                idents.append(names[distances.argmin()])
         return zip(idents, locations)
 
     # Precond:
