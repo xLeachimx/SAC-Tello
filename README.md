@@ -153,28 +153,34 @@ Of course this only looks at the first frame from the camera. To make it easier
 to see the face recognition in action SAC-Tello provides a face recognition
 version of the heads-up display. This is contained in the `TelloFaceHud` class
 and works similarly to the `TelloHud` class. For example the following code
-will allow for RC control of the Tello while streaming video that recognizes
-faces and displays names:
+will allow for commands based control of the Tello while streaming video that
+recognizes faces and displays names:
 
 ```python
 from SAC_Tello import FaceEncoder
-from SAC_Tello import TelloRC
+from SAC_Tello import TelloDrone
 from SAC_Tello import TelloFaceHud
 if __name__ == '__main__':
     face_encoder = FaceEncoder()
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
-    drone = TelloRC()
+    drone = TelloDrone()
     hud = TelloFaceHud(drone, face_encoder)
     hud.activate_hud()
-    drone.control()
+    drone.takeoff()
+    # insert drone flight commands here
+    drone.land()
     hud.deactivate_hud()
     drone.close()
 ```
 
-Note: It may take a long time to encode all faces and so you should encode
-faces first, then use them. If a `FaceEncoder` object detects a face it does
-not recognize it will attribute the name `unknown` to it. Face recongition
-in this package not entirely reliable and results may vary.
+Notes:
+- It may take a long time to encode all faces and so you should encode
+faces first, then use them.
+- As encoding faces takes a long time, it is recommended to encode first, then
+connect to the drone as encoding time may exceed the drone's autoshutoff limit.
+- If a `FaceEncoder` object detects a face it does not recognize it will
+attribute the name `unknown` to it.
+- Face recongition in this package not entirely reliable and results may vary.
 
 ## Tello Remote Control
 
@@ -193,6 +199,9 @@ if __name__ == '__main__':
     drone.control()
     drone.close()
 ```
+
+The `TelloRC` class has it's own integrated hud system and does **not** require
+creaton and activation of a separate hud.
 
 The `control()` method begins polling loop for keyboard input. The controls
 are as follows:
