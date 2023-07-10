@@ -7,11 +7,9 @@
 #   A program for testing flying a tello drone from a ground station computer.
 # Notes:
 
-from .tello_drone import TelloDrone
-from .tello_rc import TelloRC
-from threading import Thread
-from .tello_hud import TelloHud
-from time import sleep
+from SAC_Tello import TelloRC
+from SAC_Tello import TelloDrone
+from SAC_Tello import TelloHud
 
 
 def drive_tello():
@@ -19,10 +17,7 @@ def drive_tello():
     if not drone.start():
         print("Problem connecting.")
         return False
-    hud = TelloHud(drone)
-    hud.activate_hud()
     drone.control()
-    hud.deactivate_hud()
     drone.close()
 
     

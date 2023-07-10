@@ -11,10 +11,11 @@
 #   Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
 
 
-import multiprocessing as mp
-import queue
+# import multiprocessing as mp
+from multiprocessing import Process, Queue
+from queue import Empty
 from time import sleep
-import sys
+from sys import stderr
 from threading import Thread
 
 from .tello_cmd import tello_command_loop
@@ -30,28 +31,22 @@ class TelloDrone:
     #   Sets up a connection with the Tello Drone.
     def __init__(self):
         # Setup command process
-        self.cmdQ = mp.Queue()
-        self.cmd_confQ = mp.Queue()
-        self.cmd_process = mp.Process(target=tello_command_loop, args=(self.cmdQ, self.cmd_confQ))
-        self.cmd_process.daemon = True
+        self.cmdQ = Queue(2)
+        self.cmd_confQ = Queue(2)
+        self.cmd_process = Process(target=tello_command_loop, args=(self.cmdQ, self.cmd_confQ))
         self.cmd_thread = Thread(target=self.__cmd_thread)
-        self.cmd_thread.daemon = True
         
         # Setup state process
-        self.state_haltQ = mp.Queue()
-        self.state_recQ = mp.Queue()
-        self.state_process = mp.Process(target=tello_state_loop, args=(self.state_haltQ, self.state_recQ))
-        self.state_process.daemon = True
+        self.state_haltQ = Queue(2)
+        self.state_recQ = Queue(2)
+        self.state_process = Process(target=tello_state_loop, args=(self.state_haltQ, self.state_recQ))
         self.state_thread = Thread(target=self.__state_thread)
-        self.state_thread.daemon = True
 
         # Setup video process
-        self.video_haltQ = mp.Queue()
-        self.video_recQ = mp.Queue()
-        self.video_process = mp.Process(target=tello_video_loop, args=(self.video_haltQ, self.video_recQ))
-        self.video_process.daemon = True
+        self.video_haltQ = Queue(2)
+        self.video_recQ = Queue(2)
+        self.video_process = Process(target=tello_video_loop, args=(self.video_haltQ, self.video_recQ))
         self.video_thread = Thread(target=self.__video_thread)
-        self.video_thread.daemon = True
         
         # Internal variables
         self.commandQ = []
@@ -82,7 +77,7 @@ class TelloDrone:
             conf = self.cmd_confQ.get(block=True, timeout=5)
             if not conf[0]:
                 return False
-        except queue.Empty:
+        except Empty:
             return False
 
         # Start the video stream
@@ -91,7 +86,7 @@ class TelloDrone:
             conf = self.cmd_confQ.get(block=True, timeout=5)
             if not conf[0]:
                 return False
-        except queue.Empty:
+        except Empty:
             return False
         self.state_thread.start()
         self.state_process.start()
@@ -370,7 +365,7 @@ class TelloDrone:
                 self.cmdQ.put(self.commandQ.pop(0))
                 conf = self.cmd_confQ.get()
                 if not conf[0]:
-                    print("Problem executing command ", conf[1], file=sys.stderr)
+                    print("Problem executing command ", conf[1], file=stderr)
 
     # Precond:
     #   None.
@@ -395,14 +390,11 @@ class TelloDrone:
     #
     # Postcond:
     #   Clears the q and closes it.
-    def __clear_q(q: mp.Queue):
+    @staticmethod
+    def __clear_q(q: Queue):
         try:
             while not q.empty():
                 q.get_nowait()
-        except queue.Empty:
+        except Empty:
             pass
         q.close()
-
-
-if __name__ == '__main__':
-    mp.freeze_support()

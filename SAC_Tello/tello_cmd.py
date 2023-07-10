@@ -32,16 +32,16 @@
 #       stream [on, off]: Turns the Tello video stream [on, off].
 #       emergency: send command to shut down Tello (no confirmation).
 
-import multiprocessing as mp
+from multiprocessing import Queue
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import perf_counter
 from datetime import datetime
-import queue
+from queue import Empty
 import os
 
 
-def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
+def tello_command_loop(cmd_q: Queue, conf_q: Queue):
     # Create a management object
     manager = TelloCmd()
     res = manager.startup()
@@ -115,12 +115,12 @@ def tello_command_loop(cmd_q: mp.Queue, conf_q: mp.Queue):
                     manager.emergency()
             except ValueError:
                 conf_q.put((False, 'Invalid Argument'))
-        except queue.Empty:
+        except Empty:
             pass
     try:
         while not cmd_q.empty():
             cmd_q.get_nowait()
-    except queue.Empty:
+    except Empty:
         pass
     cmd_q.close()
     manager.close()
@@ -463,3 +463,7 @@ class TelloCmd:
             except OSError as exc:
                 if not self.stop:
                     print("Caught exception socket.error : %s" % exc)
+            except UnicodeDecodeError as dec:
+                if not self.stop:
+                    self.log[-1][1] = "Decode Error"
+                    print("Caught exception Unicode 0xcc error.")

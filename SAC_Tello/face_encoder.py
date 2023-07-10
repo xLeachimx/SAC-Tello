@@ -8,7 +8,7 @@
 # Notes:
 
 import pickle
-import numpy as np
+from numpy import ones
 from face_recognition import face_encodings, face_locations, face_distance
 import cv2
 
@@ -36,7 +36,7 @@ class FaceEncoder:
     #   Returns False if no face was found.
     def encode_face(self, name, img_file):
         img = cv2.imread(img_file)
-        img = cv2.resize(img, (640*self.encode_scale, 480*self.encode_scale))
+        img = cv2.resize(img, (720*self.encode_scale, 960*self.encode_scale))
         if name not in self.encodings:
             self.encodings[name] = []
         location = face_locations(img)
@@ -56,16 +56,16 @@ class FaceEncoder:
     #   If no face matches within the specified distance, then it is labeled Unknown.
     #   Returned tuples are (name, location)
     def detect_faces(self, img, min_dist=0.6):
-        img = cv2.resize(img, (640 * self.encode_scale, 480 * self.encode_scale))
+        img = cv2.resize(img, (720 * self.encode_scale, 960 * self.encode_scale))
         locations = face_locations(img)
         encodings = face_encodings(img, locations)
         names = list(self.encodings.keys())
-        distances = np.ones(len(names))
+        distances = ones(len(names))
         idents = []
         for encoding in encodings:
             for idx, name in enumerate(names):
                 distances[idx] = face_distance(self.encodings[name], encoding).min()
-            if distances.min() > min_dist:
+            if distances.min(initial=1.0) > min_dist:
                 idents.append("unknown")
             else:
                 idents.append(names[distances.argmin()])
@@ -79,7 +79,6 @@ class FaceEncoder:
     # Note:
     #   No exceptions handled by this method.
     def load(self, filename):
-        loaded = {}
         with open(filename, 'rb') as fin:
             loaded = pickle.load(fin)
         for person in loaded:

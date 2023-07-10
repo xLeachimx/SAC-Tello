@@ -16,33 +16,38 @@
 #
 #   Commands (case insensitive) accepted:
 #       halt: Stops the process and closes the management object.
+#
+# UPD FrameSegment class taken from:
+#   https://medium.com/@fromtheast/fast-camera-live-streaming-with-udp-opencv-de2f84c73562
+
 
 from threading import Thread
-import multiprocessing as mp
-import cv2
-import queue
+from multiprocessing import Queue
+from queue import Empty
+from cv2 import VideoCapture
+from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_HW_ACCELERATION, CAP_ANY
+from math import ceil
 
 
-def tello_video_loop(halt_q: mp.Queue, frame_q: mp.Queue):
+def tello_video_loop(halt_q: Queue, frame_q: Queue):
     # Create a management object.
     manager = TelloVideo()
     manager.start()
     running = True
     while running:
         try:
-            halt = str(halt_q.get(False))
-            if halt.lower() == 'halt':
-                break
-        except queue.Empty:
+            if not halt_q.empty():
+                halt = str(halt_q.get(False))
+                if halt.lower() == 'halt':
+                    break
+        except Empty:
             pass
         if frame_q.empty():
-            frame = manager.get()
-            if frame is not None:
-                frame_q.put(frame)
+            frame_q.put( manager.get())
     try:
         while not frame_q.empty():
             frame_q.get_nowait()
-    except queue.Empty:
+    except Empty:
         pass
     frame_q.close()
     manager.close()
@@ -73,10 +78,9 @@ class TelloVideo:
     def start(self):
         # Set up the video stream
         self.stream_active = True
-        self.video_stream = cv2.VideoCapture(self.video_connect_str)
-        self.video_stream.set(cv2.CAP_PROP_BUFFERSIZE, 2)
-        self.frame_width = self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.frame_height = self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.video_stream = VideoCapture(self.video_connect_str, CAP_ANY)
+        self.frame_width = self.video_stream.get(CAP_PROP_FRAME_WIDTH)
+        self.frame_height = self.video_stream.get(CAP_PROP_FRAME_HEIGHT)
         self.video_thread.start()
         self.frame_update = False
     
@@ -88,10 +92,7 @@ class TelloVideo:
     #   Returns the most recent frame.
     #   If no new frame has been received then None is returned.
     def get(self):
-        if self.frame_update:
-            self.frame_update = False
-            return self.last_frame
-        return None
+        return self.last_frame
     
     # Precond:
     #   None.
@@ -112,12 +113,5 @@ class TelloVideo:
         while self.stream_active:
             ret, img = self.video_stream.read()
             if ret:
-                self.last_frame = (img, self.frame_width, self.frame_height)
-                self.frame_update = True
+                self.last_frame = img
         self.video_stream.release()
-        cv2.destroyAllWindows()
-        
-        
-if __name__ == '__main__':
-    mp.freeze_support()
-    

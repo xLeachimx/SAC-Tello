@@ -9,14 +9,12 @@
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
-from time import perf_counter
-import queue
-from datetime import datetime
-import multiprocessing as mp
-import os
+from time import perf_counter, sleep
+from multiprocessing import Queue
+from queue import Empty
 
 
-def tello_remote_loop(rc_q: mp.Queue, conf_q: mp.Queue):
+def tello_remote_loop(rc_q: Queue, conf_q: Queue):
     # Create a management object
     manager = TelloRemote()
     res = manager.startup()
@@ -26,30 +24,31 @@ def tello_remote_loop(rc_q: mp.Queue, conf_q: mp.Queue):
     running = True
     while running:
         # Grab from the rcQ
-        current = rc_q.get()
-        if type(current) == str:
-            if current == "halt":
-                running = False
-            elif current == "takeoff":
-                manager.takeoff()
-            elif current == "land":
-                manager.land()
-            elif current == "emergency":
-                manager.emergency()
-            elif current == "flip f":
-                manager.flip_forward()
-            elif current == "flip b":
-                manager.flip_backward()
-            elif current == "flip r":
-                manager.flip_right()
-            elif current == "flip l":
-                manager.flip_left()
-        elif type(current) == tuple:
-            manager.set_rc(*current)
+        if not rc_q.empty():
+            current = rc_q.get()
+            if type(current) == str:
+                if current == "halt":
+                    running = False
+                elif current == "takeoff":
+                    conf_q.put((manager.takeoff(), 'takeoff'))
+                elif current == "land":
+                    conf_q.put((manager.land(), 'land'))
+                elif current == "emergency":
+                    conf_q.put((manager.emergency(), 'emergency'))
+                elif current == "flip f":
+                    conf_q.put((manager.flip_forward(), 'flip f'))
+                elif current == "flip b":
+                    conf_q.put((manager.flip_backward(), 'flip b'))
+                elif current == "flip r":
+                    conf_q.put((manager.flip_right(), 'flip r'))
+                elif current == "flip l":
+                    conf_q.put((manager.flip_left(), 'flip l'))
+            elif type(current) == tuple:
+                manager.set_rc(*current)
     try:
         while not rc_q.empty():
             rc_q.get_nowait()
-    except queue.Empty:
+    except Empty:
         pass
     rc_q.close()
     manager.close()
@@ -71,23 +70,19 @@ class TelloRemote:
         # Setup receiving thread
         self.receive_thread = Thread(target=self.__receive)
         self.receive_thread.daemon = True
-        
-        # Setup rc "hearbeat" thread
-        self.rc_beat_thread = Thread(target=self.__rc_beat)
-        self.rc_beat_thread.daemon = True
     
         # Setup logs
         self.log = []
         self.rc = [0, 0, 0, 0]
         self.MAX_TIME_OUT = 10  # measured in seconds
-        self.rc_tick = 5
+        self.rc_tick = 10
         self.waiting = False
         self.last_beat = perf_counter()
     
     def startup(self):
         self.stop = False
         self.receive_thread.start()
-        self.rc_beat_thread.start()
+        # self.rc_beat_thread.start()
         if self.__connect(5):
             self.stream_on()
             return True
@@ -266,8 +261,8 @@ class TelloRemote:
     def close(self):
         self.stop = True
         self.send_channel.close()
-        self.receive_thread.join()
-        self.rc_beat_thread.join()
+        if self.receive_thread.is_alive():
+            self.receive_thread.join()
     
     # ======================================
     # PRIVATE METHODS
@@ -337,6 +332,9 @@ class TelloRemote:
             except OSError as exc:
                 if not self.stop:
                     print("Caught exception socket.error : %s" % exc)
+            except UnicodeDecodeError as dec:
+                if not self.stop:
+                    print("Caught exception Unicode 0xcc error.")
 
     # Precond:
     #   None.
@@ -347,17 +345,3 @@ class TelloRemote:
         cmd = 'rc ' + ' '.join(map(str, self.rc))
         self.last_beat = perf_counter()
         self.__send_nowait(cmd)
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Sends RC messages to the tello based on internal throttle numbers.
-    def __rc_beat(self):
-        while not self.stop:
-            if (perf_counter() - self.last_beat) > self.rc_tick and not self.waiting:
-                cmd = 'rc ' + ' '.join(map(str, self.rc))
-                self.__send_nowait(cmd)
-                
-if __name__ == '__main__':
-    mp.freeze_support()

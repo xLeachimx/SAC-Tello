@@ -9,7 +9,7 @@ A simple library for controlling a DJI Tello Drone. Built for educational use.
 > 
 > face_recognition>=1.3.0
 > 
-> pygame>=2.2.0
+> pygame>=2.5.0
 
 ### Install
 SAC-Tello can be installed by running the following command:
