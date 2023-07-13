@@ -10,14 +10,22 @@
 from SAC_Tello import TelloRC
 from SAC_Tello import TelloDrone
 from SAC_Tello import TelloHud
+from SAC_Tello import TelloFaceHud
+from SAC_Tello import FaceEncoder
+from time import sleep
 
 
 def drive_tello():
-    drone = TelloRC()
+    encoder = FaceEncoder()
+    drone = TelloDrone()
     if not drone.start():
         print("Problem connecting.")
         return False
-    drone.control()
+    hud = TelloFaceHud(drone, encoder)
+    hud.activate_hud()
+    while hud.is_active():
+        sleep(1)
+    hud.deactivate_hud()
     drone.close()
 
     

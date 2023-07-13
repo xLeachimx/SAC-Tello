@@ -50,7 +50,7 @@ class TelloDrone:
         
         # Internal variables
         self.commandQ = []
-        self.commandQ_limit = 10
+        self.commandQ_limit = 100
         self.last_state = None
         self.last_frame = None
         self.running = False

@@ -16,16 +16,13 @@
 #
 #   Commands (case insensitive) accepted:
 #       halt: Stops the process and closes the management object.
-#
-# UPD FrameSegment class taken from:
-#   https://medium.com/@fromtheast/fast-camera-live-streaming-with-udp-opencv-de2f84c73562
 
 
 from threading import Thread
 from multiprocessing import Queue
 from queue import Empty
 from cv2 import VideoCapture
-from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_HW_ACCELERATION, CAP_ANY
+from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_ANY
 from math import ceil
 
 

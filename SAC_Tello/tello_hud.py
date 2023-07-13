@@ -10,11 +10,13 @@
 from .tello_drone import TelloDrone
 from .tello_rc import TelloRC
 from time import perf_counter, sleep
-from pygame import display, draw, event, Surface, Vector2, QUIT, SRCALPHA
+from pygame import display, draw, event, Surface, Vector2, QUIT, SRCALPHA, KEYDOWN, K_p
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer
 from math import sin, cos, radians
 from threading import Thread
+import uuid
+from cv2 import imwrite
 
 
 class TelloHud:
@@ -75,7 +77,7 @@ class TelloHud:
         # Setup video loop basics
         frame_timer = perf_counter()
         frame_delta = 1 / 30
-        event.set_allowed([QUIT])
+        event.set_allowed([QUIT, KEYDOWN])
         horizon_rad = 50
         horizon_size = 4 * horizon_rad
         horizon_placement = ((screen.get_width() - horizon_size) // 2, (screen.get_height() - horizon_size) // 2)
@@ -107,6 +109,11 @@ class TelloHud:
                 display.flip()
                 for _ in event.get(QUIT):
                     self.running = False
+                for evt in event.get(KEYDOWN):
+                    if evt.key == K_p:
+                        filename = str(uuid.uuid4()) + '.jpg'
+                        imwrite(filename, frame)
+                        
     
     def __artificial_horizon(self, rad: int, pitch: int, roll: int):
         result = Surface((4 * rad, 4 * rad), SRCALPHA, 32)

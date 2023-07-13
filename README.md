@@ -24,6 +24,12 @@ python -m pip install SAC-Tello
 ```
 for Windows
 
+Note: Some users may have problems installing dependencies such as `opencv-python`
+or `face_recognition` or dependencies of `SAC-Tello` dependencies. We find that
+often this due to external non-python build tools being needed, for example
+`opency-python` needs C++ build tools from Visual Studio to properly install on
+Windows.
+
 # How To Use
 
 Since this package spawns multiple child processes any use of the package must originate from
@@ -111,6 +117,11 @@ if __name__ == '__main__':
 The HUD will launch a separate window when activated. This window can be
 closed at anytime by pressing the `X` in the upper right-hand corner.
 
+Pressing the `P` key while the hud is active and streaming from the Tello will
+save the current frame from the Tello (this will remove all HUD elements.) The
+file will be saved, as a jpeg, in the current working directory using a
+UUID as its name.
+
 Note: Before the HUD is activated nothing will happen. Once the HUD is
 active you will need to deactivate before your program ends.
 
@@ -173,13 +184,43 @@ if __name__ == '__main__':
     drone.close()
 ```
 
+Since encoding faces can take a long time the `FaceEncoder` class gives the
+ability to save and load a set of encodings. Consider the following block of
+code:
+
+```python
+from SAC_Tello import FaceEncoder
+if __name__ == '__main__':
+    face_encoder = FaceEncoder()
+    face_encoder.encode_face("Jim", "jim_selfie.jpg")
+    # Saves the encodings.
+    face_encoder.save("my_encodings.enc")
+    another_encoder = FaceEncoder()
+    another_encoder.load("my_encodings.enc")
+```
+
+This code saves the encodings computed in the first `FaceEndocer` object to the
+file `my_encodings.enc` and then loads them into another `FaceEncoder` object.
+
+If you are going to encode many faces for use with the Tello we suggest you write
+a separate program which encodes all the faces you desire and saves that
+information to a file, then when using the Tello you load that file. This ensures
+the Tello will not automatically shutdown while face encoding is happening.
+
 Notes:
+- It is best to use photos taken by the Tello itself. This helps to reduce the
+potential difference in distortion, resolution, and sapect ratio from affecting
+the accuracy of face recognition.
+- It is possible to assign multiple images to a single name. This will increase
+accuracy of face detection.
 - It may take a long time to encode all faces and so you should encode
 faces first, then use them.
 - As encoding faces takes a long time, it is recommended to encode first, then
 connect to the drone as encoding time may exceed the drone's autoshutoff limit.
 - If a `FaceEncoder` object detects a face it does not recognize it will
 attribute the name `unknown` to it.
+- Detection is not a fast algorithm and while the HUD will attempt 30 frames
+per second, actual refresh rate varies with a number of factors.
 - Face recongition in this package not entirely reliable and results may vary.
 
 ## Tello Remote Control
@@ -206,13 +247,17 @@ creaton and activation of a separate hud.
 The `control()` method begins polling loop for keyboard input. The controls
 are as follows:
 
-| Key Press | Effect                |
-|-----------|-----------------------|
-| T         | Takeoff               |
-| L         | Land                  |
-| ESCAPE    | Emergency Kill Switch | 
-| BACKSPACE | End Remote Control    |
-| DELETE    | Zero Velocity         |
+| Key Press   | Effect                  |
+|-------------|-------------------------|
+| T           | Takeoff                 |
+| L           | Land                    |
+| ESCAPE      | Emergency Kill Switch   | 
+| BACKSPACE   | End Remote Control      |
+| DELETE      | Zero Velocity           |
+| LEFT ARROW  | Flip Drone to the Left  |
+| RIGHT ARROW | Flip Drone to the Right |
+| UP ARROW    | Flip Drone Forward      |
+| DOWN ARROW  | Flip Drone Backeard     |
 
 | Key Held | Effect                      |
 |----------|-----------------------------|
