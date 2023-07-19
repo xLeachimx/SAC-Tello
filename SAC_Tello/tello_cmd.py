@@ -98,12 +98,21 @@ def tello_command_loop(cmd_q: Queue, conf_q: Queue):
                         res = manager.flip_left()
                     elif cmd[1] == 'r':
                         res = manager.flip_right()
-                elif cmd[0] == "move":
+                elif cmd[0] == "go":
                     res = manager.move(int(cmd[1]),
                                        int(cmd[2]),
                                        int(cmd[3]),
                                        int(cmd[4]))
                     conf_q.put((res, 'move'))
+                elif cmd[0] == "curve":
+                    res = manager.curve(int(cmd[1]),
+                                        int(cmd[2]),
+                                        int(cmd[3]),
+                                        int(cmd[4]),
+                                        int(cmd[5]),
+                                        int(cmd[6]),
+                                        int(cmd[7]))
+                    conf_q.put((res, 'curve'))
                 elif cmd[0] == "stream":
                     if cmd[1] == "on":
                         res = manager.stream_on()
@@ -113,6 +122,9 @@ def tello_command_loop(cmd_q: Queue, conf_q: Queue):
                         conf_q.put((res, 'stream off'))
                 elif cmd[0] == "emergency":
                     manager.emergency()
+                    conf_q.put((True, "Emergency"))
+                else:
+                    conf_q.put((False, "Unknown"))
             except ValueError:
                 conf_q.put((False, 'Invalid Argument'))
         except Empty:
@@ -344,10 +356,39 @@ class TelloCmd:
     #   Returns False if the command could not be sent or executed for any
     #       reason.
     def move(self, x, y, z, spd):
-        if not self.connected or not (20 < max(abs(x), abs(y), abs(z)) < 500) or spd not in range(10, 101):
+        if (not self.connected) or (not (20 < max(abs(x), abs(y), abs(z)) < 500)) or (spd not in range(10, 101)):
             return False
-        coord_str = ' '.join([str(x), str(y), str(z)])
+        coord_str = ' '.join([str(x), str(y), str(z), str(spd)])
         res = self.__send("go " + coord_str)
+        return res is not None and res == 'ok'
+
+    # Precond:
+    #   x1 the x coordinate of the point to curve through.
+    #   y1 the y coordinate of the point to curve through.
+    #   z1 the z coordinate of the point to curve through.
+    #   x2 the final amount to move in the x-axis.
+    #   y2 the final amount to move in the y-axis.
+    #   z2 the final amount to move in the z-axis.
+    #   spd is the speed of movement
+    #
+    # Postcond:
+    #   Moves the drone in a curve defined by the current and two given
+    #   coordinates.
+    #   Returns False if the command could not be sent or executed for any
+    #       reason.
+    def curve(self, x1, y1, z1, x2, y2, z2, spd):
+        p1 = (x1, y1, z1)
+        p2 = (x2, y2, z2)
+        in_range = True
+        for coord in p1:
+            in_range = in_range and (20 <= abs(coord) <= 500)
+        for coord in p2:
+            in_range = in_range and (20 <= abs(coord) <= 500)
+        if (not self.connected) or not in_range or (spd not in range(10, 61)):
+            return False
+        coord_str = list(map(str, p1)) + list(map(str, p2)) + [str(spd)]
+        coord_str = ' '.join(coord_str)
+        res = self.__send("curve " + coord_str)
         return res is not None and res == 'ok'
 
     # Precond:
