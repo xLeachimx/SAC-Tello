@@ -13,6 +13,7 @@ from SAC_Tello import TelloHud
 from SAC_Tello import TelloFaceHud
 from SAC_Tello import FaceEncoder
 from time import sleep
+import cv2
 
 
 def drive_tello():
