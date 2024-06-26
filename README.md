@@ -7,8 +7,6 @@ A simple library for controlling a DJI Tello Drone. Built for educational use.
 > 
 > opencv-python>=4.6.0.66
 > 
-> face_recognition>=1.3.0
-> 
 > pygame>=2.5.0
 
 # Disclaimer
@@ -31,13 +29,13 @@ python -m pip install SAC-Tello
 ```
 for Windows
 
-Note: Some users may have problems installing dependencies such as `opencv-python`
-or `face_recognition` or dependencies of `SAC-Tello` dependencies. We find that
+Note: Some users may have problems installing dependencies such as `opencv-python` 
+or dependencies of `SAC-Tello` dependencies. We find that
 often this due to external non-python build tools being needed, for example
-`opency-python` needs C++ build tools from Visual Studio to properly install on
+`opencv-python` needs C++ build tools from Visual Studio to properly install on
 Windows.
 
-# How To Use
+# How To Use (Older version <= 0.1.1)
 
 Since this package spawns multiple child processes any use of the package must originate from
 a protected starting point (i.e. `if __name__ == __main__:`) or else a Runtime Error **will**
@@ -70,7 +68,6 @@ if __name__ == '__main__':
     drone.start()
     drone.takeoff()
     drone.land()
-    drone.complete()
     drone.close()
 ```
 
@@ -96,9 +93,8 @@ The following are all commands that can be sent to the Tello:
 | curve         | curve         | x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, spd: int  |
 | emergency     | emergency     | None                                                            |
 
-Commands are run in parallel and put into a queue for execution. In order
-to complete the remaining commands in the queue, simply call the `complete()`
-method of the TelloDrone object.
+Commands are run in parallel to their display in the video feed. This is required to not
+disturb the continuity of the video feed.
 
 ## Tello Heads-up Display
 
@@ -217,19 +213,22 @@ the Tello will not automatically shutdown while face encoding is happening.
 
 Notes:
 - It is best to use photos taken by the Tello itself. This helps to reduce the
-potential difference in distortion, resolution, and sapect ratio from affecting
+potential difference in distortion, resolution, and aspect ratio from affecting
 the accuracy of face recognition.
 - It is possible to assign multiple images to a single name. This will increase
-accuracy of face detection.
+the accuracy of face recognition.
 - It may take a long time to encode all faces and so you should encode
 faces first, then use them.
 - As encoding faces takes a long time, it is recommended to encode first, then
-connect to the drone as encoding time may exceed the drone's autoshutoff limit.
+connect to the drone as encoding time may exceed the drone's auto-shutoff limit.
 - If a `FaceEncoder` object detects a face it does not recognize it will
 attribute the name `unknown` to it.
-- Detection is not a fast algorithm and while the HUD will attempt 30 frames
-per second, actual refresh rate varies with a number of factors.
-- Face recongition in this package not entirely reliable and results may vary.
+- With recent update (>= version 0.1.1) detection is capable of realtime performance
+30fps, with reasonable hardware.
+- Face Recognition (which occurs after detection) uses a model (S-Face) which is
+designed for speed of recognition, however performance degrades with number of faces
+in frame and number of faces registered.
+- Face recognition in this package not entirely reliable and results may vary.
 
 ## Tello Remote Control
 
@@ -249,8 +248,8 @@ if __name__ == '__main__':
     drone.close()
 ```
 
-The `TelloRC` class has it's own integrated hud system and does **not** require
-creaton and activation of a separate hud.
+The `TelloRC` class has its own integrated hud system and does **not** require
+creation and activation of a separate hud.
 
 The `control()` method begins polling loop for keyboard input. The controls
 are as follows:
