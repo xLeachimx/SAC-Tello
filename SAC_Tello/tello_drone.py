@@ -320,6 +320,37 @@ class TelloDrone:
             return True
         return False
 
+    # Precond:
+    #   x1 the x coordinate of the point to curve through.
+    #   y1 the y coordinate of the point to curve through.
+    #   z1 the z coordinate of the point to curve through.
+    #   x2 the final amount to move in the x-axis.
+    #   y2 the final amount to move in the y-axis.
+    #   z2 the final amount to move in the z-axis.
+    #   spd is the speed of movement
+    #
+    # Postcond:
+    #   Moves the drone in a curve defined by the current and two given
+    #   coordinates.
+    #   Returns False if the command could not be sent or executed for any
+    #       reason.
+    def curve(self, x1, y1, z1, x2, y2, z2, spd):
+        p1 = (x1, y1, z1)
+        p2 = (x2, y2, z2)
+        in_range = True
+        for coord in p1:
+            in_range = in_range and (20 <= abs(coord) <= 500)
+        for coord in p2:
+            in_range = in_range and (20 <= abs(coord) <= 500)
+        if not in_range or (spd not in range(10, 61)):
+            return False
+        coord_str = list(map(str, p1)) + list(map(str, p2)) + [str(spd)]
+        coord_str = ' '.join(coord_str)
+        if len(self.commandQ) < self.commandQ_limit:
+            self.commandQ.append("curve " + coord_str)
+            return True
+        return False
+
     # ======================================
     # Info METHODS
     # ======================================

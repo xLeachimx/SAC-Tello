@@ -11,6 +11,13 @@ A simple library for controlling a DJI Tello Drone. Built for educational use.
 > 
 > pygame>=2.5.0
 
+# Disclaimer
+
+This is not official software of DJI or Ryze. All code is
+given as-is. Please seek official DJI Tello resources for
+additional information about the DJI Tello's technical information
+and SDK.
+
 ### Install
 SAC-Tello can be installed by running the following command:
 ```commandline
@@ -69,24 +76,25 @@ if __name__ == '__main__':
 
 The following are all commands that can be sent to the Tello:
 
-| Command       | Method        | Arguments                        |
-|---------------|---------------|----------------------------------| 
-| takeoff       | takeoff       | None                             |
-| land          | land          | None                             |
-| up            | up            | distance: int                    |
-| down          | down          | distance: int                    |
-| left          | left          | distance: int                    |
-| right         | right         | distance: int                    |
-| forward       | forward       | distance: int                    |
-| backward      | backward      | distance: int                    |
-| rotate cw     | rotate_cw     | degrees: int                     |
-| rotate ccw    | rotate_ccw    | degrees: int                     |
-| flip left     | flip_left     | None                             |
-| flip right    | flip_right    | None                             |
-| flip forward  | flip_forward  | None                             |
-| flip backward | flip_backward | None                             |
-| move          | move          | x: int, y: int, z: int, spd: int |
-| emergency     | emergency     | None                             |
+| Command       | Method        | Arguments                                                       |
+|---------------|---------------|-----------------------------------------------------------------| 
+| takeoff       | takeoff       | None                                                            |
+| land          | land          | None                                                            |
+| up            | up            | distance: int                                                   |
+| down          | down          | distance: int                                                   |
+| left          | left          | distance: int                                                   |
+| right         | right         | distance: int                                                   |
+| forward       | forward       | distance: int                                                   |
+| backward      | backward      | distance: int                                                   |
+| rotate cw     | rotate_cw     | degrees: int                                                    |
+| rotate ccw    | rotate_ccw    | degrees: int                                                    |
+| flip left     | flip_left     | None                                                            |
+| flip right    | flip_right    | None                                                            |
+| flip forward  | flip_forward  | None                                                            |
+| flip backward | flip_backward | None                                                            |
+| go            | move          | x: int, y: int, z: int, spd: int                                |
+| curve         | curve         | x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, spd: int  |
+| emergency     | emergency     | None                                                            |
 
 Commands are run in parallel and put into a queue for execution. In order
 to complete the remaining commands in the queue, simply call the `complete()`
