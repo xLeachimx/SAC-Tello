@@ -36,25 +36,27 @@ class FaceEncoder:
                                                                "face_recognition_sface_2021dec.onnx"),"")
     _COSINE_THRESHOLD = 0.6
 
-    # Precond:
-    #   encode is a string containing a file name to load a set of encodings from.
-    #
-    # Postcond:
-    #   Creates a new FaceEncoder object loaded with encodings from a given file.
     def __init__(self, load_file=None):
+        """
+        FaceEncoder class constructor
+        :param load_file:
+            Name of the file to load encoded faces from (optional.)
+        """
         self.encodings = {}
         if load_file is not None:
             self.load(load_file)
 
-    # Precond:
-    #   name is a string containing the name of the person whose face is being encoded.
-    #   img_file is a string containing the name of a file containing an image of a single
-    #       person's face.
-    #
-    # Postcond:
-    #   Updates the encodings based on the image file.
-    #   Returns False if no face was found.
-    def encode_face(self, name, img_file):
+    def encode_face(self, name: str, img_file: str):
+        """
+        Encodes the first detected face in the image file and assigns it a name.
+        :param name:
+            The string to associate to the first detected face in the image.
+        :param img_file:
+            A string containing the filename of a file containing the image of a single person's face.
+        :return:
+            Returns True if a face was successfully registered under the given name.
+            Returns False otherwise.
+        """
         img = cv.resize(cv.imread(img_file), self._TELLO_RES)
         if name not in self.encodings:
             self.encodings[name] = []
@@ -66,15 +68,16 @@ class FaceEncoder:
             return True
         return False
     
-    # Precond:
-    #   img is a valid ndarray representing an image.
-    #   min_dist is a floating point number indicating the minimal face distance (default: 0.6) for recognition.
-    #
-    # Postcond:
-    #   Returns the most likely name of the faces in the image, paired with their locations.
-    #   If no face matches within the specified distance, then it is labeled Unknown.
-    #   Returned tuples are (name, location)
     def detect_faces(self, img: np.ndarray) -> list:
+        """
+        Converts the image into a list of names and associated face locations.
+        :param img:
+            A valid ndarray representing an image.
+        :return:
+            Returns a list containing (name, location) pairs. Each location represents a
+            rectangle (top, left, height, width.) If a face is detected, but not recognized,
+            the name returned is Unknown.
+        """
         img = cv.resize(img, self._TELLO_RES)
         face_locations = self.__find_faces(img)
         if len(face_locations) == 0:
@@ -89,14 +92,15 @@ class FaceEncoder:
         idents = list(map(self.__match_face, encodings))
         return list(zip(idents, face_locations))
 
-    # Precond:
-    #   filename is the path to a file which contains serialized face encodings.
-    #
-    # Postcond:
-    #   Updates the recognizers encodings using the provided file.
-    # Note:
-    #   No exceptions handled by this method.
-    def load(self, filename):
+    def load(self, filename: str):
+        """
+        Loads a given encodings file and adds it to the current set of encodings the object contains.
+        Note: This method does not handle any exceptions.
+        :param filename:
+            A string containing the filename of a file which contains serialized face encodings.
+        :return:
+            None.
+        """
         with open(filename, 'rb') as fin:
             loaded = pickle.load(fin)
         for person in loaded:
@@ -111,7 +115,15 @@ class FaceEncoder:
     #   Saves the known face encodings to the provided file.
     # Note:
     #   No exceptions handled by this method.
-    def save(self, filename):
+    def save(self, filename: str):
+        """
+        Saves the current set of encodings held by the object as a set of serialized face encodings.
+        Notes: The file will be overwritten. No exceptions are handled by this method.
+        :param filename:
+            A string containing the filename of the file to output the serialized face encodings to.
+        :return:
+            None.
+        """
         with open(filename, 'wb') as fout:
             pickle.dump(self.encodings, fout)
     
@@ -150,6 +162,14 @@ class FaceEncoder:
             return None
     
     def __match_face(self, unknown_encoding: np.ndarray) -> str:
+        """
+        Attempts to match a name to a given face encoding.
+        :param unknown_encoding:
+            A 128 dimensional vector representing the face to identify.
+        :return:
+            Returns the name associated with the closest face. If no registered face encoding is close enough
+            the name Unknown is returned instead.
+        """
         best_sim = 0.0
         best_match = None
         for name, encoding in self.encodings.items():
