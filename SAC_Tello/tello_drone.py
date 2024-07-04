@@ -9,49 +9,31 @@
 #
 # Notes:
 #   Some code inspired/borrowed from: github.com/dji-sdk/Tello-Python/
+#   Update 30 June 2024:
+#       Changed to multi-threaded single process.
 
-
-# import multiprocessing as mp
-from multiprocessing import Process, Queue
-from queue import Empty
-from time import sleep
-from sys import stderr
 from threading import Thread
+import numpy as np
 
-from .tello_cmd import tello_command_loop
-from .tello_state import tello_state_loop
-from .tello_video import tello_video_loop
+from .tello_cmd import TelloCmd
+from .tello_state import TelloState
+from .tello_video import TelloVideo
 
 
 class TelloDrone:
-    # Precond:
-    #   The computer creating the TelloDrone instance is connected to the Tello's Wi-Fi.
-    #
-    # Postcond:
-    #   Sets up a connection with the Tello Drone.
+    """A class for handling all Tello streams from a central object."""
     def __init__(self):
-        # Setup command process
-        self.cmdQ = Queue(2)
-        self.cmd_confQ = Queue(2)
-        self.cmd_process = Process(target=tello_command_loop, args=(self.cmdQ, self.cmd_confQ))
-        self.cmd_thread = Thread(target=self.__cmd_thread)
-        
-        # Setup state process
-        self.state_haltQ = Queue(2)
-        self.state_recQ = Queue(2)
-        self.state_process = Process(target=tello_state_loop, args=(self.state_haltQ, self.state_recQ))
-        self.state_thread = Thread(target=self.__state_thread)
-
-        # Setup video process
-        self.video_haltQ = Queue(2)
-        self.video_recQ = Queue(2)
-        self.video_process = Process(target=tello_video_loop, args=(self.video_haltQ, self.video_recQ))
-        self.video_thread = Thread(target=self.__video_thread)
+        """
+        The TelloDrone class constructor. Does not automatically connect to the Tello Drone.
+        """
+        self.cmd = TelloCmd()
+        self.state = TelloState()
+        self.video = TelloVideo()
         
         # Internal variables
-        self.commandQ = []
-        self.commandQ_limit = 100
+        self.state_update_thread = Thread(target=self.__state_update_thread, daemon=True)
         self.last_state = None
+        self.video_update_thread = Thread(target=self.__video_update_thread, daemon=True)
         self.last_frame = None
         self.running = False
 
@@ -59,373 +41,213 @@ class TelloDrone:
     #   MANAGEMENT METHODS
     # ==========================
     
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Starts the TelloDrone object.
-    #   Connects to the Tello.
-    #   Connects to all streams and begins all processes.
-    #   Returns True if all processes have been started.
-    def start(self):
+    def start(self) -> bool:
+        """
+        Initiates the connection to the Tello and all related streams.
+        :return: Returns true if all connections are made, returns false otherwise.
+        """
         self.running = True
-        self.commandQ = []
-        self.cmd_thread.start()
-        self.cmd_process.start()
-        # Check to see if connection worked.
-        try:
-            conf = self.cmd_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
+        if self.cmd.connect() and self.cmd.stream_on():
+            self.video.start()
+            self.state.start()
+            self.state_update_thread.start()
+            self.video_update_thread.start()
+            return True
+        return False
 
-        # Start the video stream
-        self.cmdQ.put("stream on")
-        try:
-            conf = self.cmd_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        self.state_thread.start()
-        self.state_process.start()
-        self.video_thread.start()
-        self.video_process.start()
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Closes down communication with the drone and writes the log to a file.
-    def close(self):
+    def close(self) -> None:
+        """
+        Closes all additional threads and streams. Writes out all applicable log files.
+        :return: None.
+        """
         self.running = False
-        if self.cmd_thread.is_alive():
-            self.cmd_thread.join()
-        if self.state_thread.is_alive():
-            self.state_thread.join()
-        if self.video_thread.is_alive():
-            self.video_thread.join()
-        if self.video_process.is_alive():
-            self.video_haltQ.put("halt")
-            TelloDrone.__clear_q(self.video_recQ)
-            self.video_process.join()
-        if self.state_process.is_alive():
-            self.state_haltQ.put("halt")
-            TelloDrone.__clear_q(self.state_recQ)
-            self.state_process.join()
-        if self.cmd_process.is_alive():
-            self.cmdQ.put("halt")
-            TelloDrone.__clear_q(self.cmd_confQ)
-            self.cmd_process.join()
-        
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Waits until all commands are complete.
-    def complete(self):
-        while len(self.commandQ) > 0:
-            sleep(1)
+        self.cmd.close()
+        self.state.close()
+        self.video.close()
+        self.state_update_thread.join()
+        self.video_update_thread.join()
 
     # ======================================
     # COMMAND METHODS
     # ======================================
    
-    # Precond:
-    #   None.
-    #
-    # Postcond
-    #   Adds takeoff command to the command queue.
-    def takeoff(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("takeoff")
-            return True
-        return False
+    def takeoff(self) -> bool:
+        """
+        Sends the takeoff command to the Tello.
+        :return: Returns true if command sent with no error, false otherwise.
+        """
+        return self.cmd.takeoff()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond
-    #   Adds land command to the command queue.
-    def land(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("land")
-            return True
-        return False
+    def land(self) -> bool:
+        """
+        Sends the takeoff command to the Tello.
+        :return: Returns true if command sent with no error, false otherwise.
+        """
+        return self.cmd.land()
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds up command to the command queue.
-    def up(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("up " + str(val))
-            return True
-        return False
+    def up(self, val: int) -> bool:
+        """
+        Sends the command to raise the Tello by a specified distance (cm).
+        :param val: The number of centimeters to raise the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.up(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds down command to the command queue.
-    def down(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("down " + str(val))
-            return True
-        return False
+    def down(self, val: int) -> bool:
+        """
+        Sends the command to lower the Tello by a specified distance (cm).
+        :param val: The number of centimeters to lower the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.down(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds left command to the command queue.
-    def left(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("left " + str(val))
-            return True
-        return False
+    def left(self, val: int) -> bool:
+        """
+        Sends the command to strafe the Tello to the left by a specified distance (cm).
+        :param val: The number of centimeters to strafe the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.left(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds right command to the command queue.
-    def right(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("right " + str(val))
-            return True
-        return False
+    def right(self, val: int) -> bool:
+        """
+        Sends the command to strafe the Tello to the right by a specified distance (cm).
+        :param val: The number of centimeters to strafe the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.right(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds forward command to the command queue.
-    def forward(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("forward " + str(val))
-            return True
-        return False
+    def forward(self, val: int) -> bool:
+        """
+        Sends the command to move the Tello forward by a specified distance (cm).
+        :param val: The number of centimeters to move the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.forward(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds backward command to the command queue.
-    def backward(self, val):
-        if val not in range(20, 501):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("backward " + str(val))
-            return True
-        return False
+    def backward(self, val: int) -> bool:
+        """
+        Sends the command to move the Tello backward by a specified distance (cm).
+        :param val: The number of centimeters to move the Tello by. Must be in range [20, 500].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.backward(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds rotate cw command to the command queue.
-    def rotate_cw(self, val):
-        if val not in range(1, 361):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("rotate cw " + str(val))
-            return True
-        return False
+    def rotate_cw(self, val: int) -> bool:
+        """
+        Sends the command to rotate (yaw) the Tello clockwise by a specified number of degrees.
+        :param val: The number of degrees to rotate the Tello by. Must be in range [1, 360].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.rotate_cw(val)
 
-    # Precond:
-    #   val is an integer representing the amount to move
-    #
-    # Postcond:
-    #   Adds rotate ccw command to the command queue.
-    def rotate_ccw(self, val):
-        if val not in range(1, 361):
-            return False
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("rotate ccw " + str(val))
-            return True
-        return False
+    def rotate_ccw(self, val: int) -> bool:
+        """
+        Sends the command to rotate (yaw) the Tello counterclockwise by a specified number of degrees.
+        :param val: The number of degrees to rotate the Tello by. Must be in range [1, 360].
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.rotate_ccw(val)
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip l command to the command queue.
-    def flip_left(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("flip l")
-            return True
-        return False
+    def flip_left(self) -> bool:
+        """
+        Sends the command to flip the Tello to the left.
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.flip_left()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip r command to the command queue.
-    def flip_right(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("flip r")
-            return True
-        return False
+    def flip_right(self) -> bool:
+        """
+        Sends the command to flip the Tello to the right.
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.flip_right()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip f command to the command queue.
-    def flip_forward(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("flip f")
-            return True
-        return False
+    def flip_forward(self) -> bool:
+        """
+        Sends the command to flip the Tello to forward.
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.flip_forward()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip b command to the command queue.
-    def flip_backward(self):
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("flip b")
-            return True
-        return False
+    def flip_backward(self) -> bool:
+        """
+        Sends the command to flip the Tello to backward.
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.flip_backward()
 
-    # Precond:
-    #   x the amount to move in the x-axis.
-    #   y the amount to move in the y-axis.
-    #   z the amount to move in the z-axis.
-    #   spd is the speed of movement
-    #
-    # Postcond:
-    #   Adds the move command to the command queue.
-    def move(self, x, y, z, spd):
-        if not (20 < max(abs(x), abs(y), abs(z)) < 500) or spd not in range(10, 101):
-            return False
-        coord_str = ' '.join([str(x), str(y), str(z), str(spd)])
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("go " + coord_str)
-            return True
-        return False
+    def move(self, x: int, y: int, z: int, spd: int) -> bool:
+        """
+        Sends the command to move the Tello such that it is properly displaced (cm) in the given x, y, and z directions
+        at the given speed. Values for x, y, and z cannot all simultaneously be in the range [-20, 20]
+        :param x: The amount of displacement (cm) in the x (forward/backward) direction. Must be in range [-500, 500].
+        :param y: The amount of displacement (cm) in the y (left/right) direction. Must be in range [-500, 500].
+        :param z: The amount of displacement (cm) in the z (down/up) direction. Must be in range [-500, 500].
+        :param spd: Speed to perform the move at (cm/s).
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.move(x, y, z, spd)
 
-    # Precond:
-    #   x1 the x coordinate of the point to curve through.
-    #   y1 the y coordinate of the point to curve through.
-    #   z1 the z coordinate of the point to curve through.
-    #   x2 the final amount to move in the x-axis.
-    #   y2 the final amount to move in the y-axis.
-    #   z2 the final amount to move in the z-axis.
-    #   spd is the speed of movement
-    #
-    # Postcond:
-    #   Moves the drone in a curve defined by the current and two given
-    #   coordinates.
-    #   Returns False if the command could not be sent or executed for any
-    #       reason.
-    def curve(self, x1, y1, z1, x2, y2, z2, spd):
-        p1 = (x1, y1, z1)
-        p2 = (x2, y2, z2)
-        in_range = True
-        for coord in p1:
-            in_range = in_range and (20 <= abs(coord) <= 500)
-        for coord in p2:
-            in_range = in_range and (20 <= abs(coord) <= 500)
-        if not in_range or (spd not in range(10, 61)):
-            return False
-        coord_str = list(map(str, p1)) + list(map(str, p2)) + [str(spd)]
-        coord_str = ' '.join(coord_str)
-        if len(self.commandQ) < self.commandQ_limit:
-            self.commandQ.append("curve " + coord_str)
-            return True
-        return False
+    def curve(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, spd: int) -> bool:
+        """
+        Sends the command to move the Tello along a curve such that the final displacement (cm) is equal to x2, y2, z2
+        and at some point during the move the curve passes through the displacement values of x1, y1, z1. Values for
+        any x, y, and z cannot all simultaneously be in the range [-20, 20]. Arc radius must be between 50cm and 1000cm.
+        :param x1: The x displacement to pass the curve through.
+        :param y1: The y displacement to pass the curve through.
+        :param z1: The z displacement to pass the curve through.
+        :param x2: The x displacement to end movement at.
+        :param y2: The y displacement to end movement at.
+        :param z2: The z displacement to end movement at.
+        :param spd: Speed to perform the move at (cm/s).
+        :return: Returns true if the command succeeded, false otherwise.
+        """
+        return self.cmd.curve(x1, y1, z1, x2, y2, z2, spd)
+    
+    def emergency(self) -> None:
+        """
+        Send the Tello the emergency shutdown command, in triplicate. Does not wait for a response.
+        :return: None
+        """
+        self.cmd.emergency()
 
     # ======================================
     # Info METHODS
     # ======================================
     
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Returns the last frame taken by the Tello.
-    #   Returns None if the stream is off.
-    def get_frame(self):
+    def get_frame(self) -> np.ndarray | None:
+        """
+        Gets the last frame read from the Tello, if it exists.
+        :return: Returns the last frame as a numpy array (openCV format.) If no frame exists returns None instead.
+        """
         return self.last_frame
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Returns the last state received from the Tello as a dictionary.
-    def get_state(self):
+    def get_state(self) -> dict | None:
+        """
+        Gets the last state read from the Tello, if it exists.
+        :return: Returns the last state as a dictionary (str -> str). If no state exists returns None instead.
+        """
         return self.last_state
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Sends the emergency command, in triplicate. Does not wait for response.
-    def emergency(self):
-        for _ in range(3):
-            self.cmdQ.put("emergency")
 
     # ======================================
     # PRIVATE METHODS
     # ======================================
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Thread handling command execution.
-    def __cmd_thread(self):
+    def __state_update_thread(self) -> None:
+        """
+        Thread for handling state extraction.
+        :return: None.
+        """
         while self.running:
-            if len(self.commandQ) > 0 and self.cmdQ.empty():
-                self.cmdQ.put(self.commandQ.pop(0))
-                conf = self.cmd_confQ.get()
-                if not conf[0]:
-                    print("Problem executing command ", conf[1], file=stderr)
+           if self.state.has_state():
+               self.last_state = self.state.get()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Thread handling state extraction..
-    def __state_thread(self):
+    def __video_update_thread(self) -> None:
+        """
+        Thread for handling video frame extraction.
+        :return: None.
+        """
         while self.running:
-           self.last_state = self.state_recQ.get()
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Thread handling video extraction.
-    def __video_thread(self):
-        while self.running:
-            self.last_frame = self.video_recQ.get()
-        
-    # Precond:
-    #   q is a valid mp.Queue object.
-    #
-    # Postcond:
-    #   Clears the q and closes it.
-    @staticmethod
-    def __clear_q(q: Queue):
-        try:
-            while not q.empty():
-                q.get_nowait()
-        except Empty:
-            pass
-        q.close()
+            if self.video.has_frame():
+                self.last_frame = self.video.get()
