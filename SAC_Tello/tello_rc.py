@@ -6,13 +6,12 @@
 # Purpose:
 #   A class for handling a multi-processed tello drone using keyboard controls.
 # Notes:
+#   Update 4 July 2024:
+#       Changed to multi-threaded single process.
 
-
-from multiprocessing import Queue, Process
-from queue import Empty
 from time import perf_counter
 from math import log1p
-from pygame import display, draw, Surface, Vector2, QUIT, SRCALPHA
+from pygame import display, draw, Surface, Vector2, SRCALPHA
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer
 from pygame import KEYDOWN, QUIT, K_l, K_t, K_DELETE, K_BACKSPACE, K_ESCAPE
@@ -22,39 +21,25 @@ from pygame import event as pg_event
 from threading import Thread
 from math import sin, cos, radians
 
-from .tello_remote import tello_remote_loop
-from .tello_state import tello_state_loop
-from .tello_video import tello_video_loop
+from .tello_remote import TelloRemote
+from .tello_state import TelloState
+from .tello_video import TelloVideo
 
 
 class TelloRC:
-    # Precond:
-    #   The computer creating the TelloDrone instance is connected to the Tello's Wi-Fi.
-    #
-    # Postcond:
-    #   Sets up a connection with the Tello Drone.
+    """
+    A class for controlling a Tello Drone using RC controls via keyboard controls.
+    """
     def __init__(self):
-        # Setup command process
-        self.rcQ = Queue()
-        self.rc_confQ = Queue()
-        self.rc_process = Process(target=tello_remote_loop, args=(self.rcQ, self.rc_confQ))
-        
-        # Setup state process
-        self.state_haltQ = Queue()
-        self.state_recQ = Queue()
-        self.state_process = Process(target=tello_state_loop, args=(self.state_haltQ, self.state_recQ))
-        self.state_thread = Thread(target=self.__state_thread)
-        
-        # Setup video process
-        self.video_haltQ = Queue()
-        self.video_recQ = Queue()
-        self.video_process = Process(target=tello_video_loop, args=(self.video_haltQ, self.video_recQ))
-        self.video_thread = Thread(target=self.__video_thread)
+        """
+        Constructor for the TelloRC class. Does not automatically connect to the Tello Drone.
+        """
+        self.remote = TelloRemote()
+        self.video = TelloVideo()
+        self.state = TelloState()
         
         # Internal variables
         self.current_rc = [0, 0, 0, 0]
-        self.last_state = None
-        self.last_frame = None
         self.running = False
         self.vel_timing = 10
 
@@ -88,80 +73,69 @@ class TelloRC:
     #   MANAGEMENT METHODS
     # ==========================
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Starts the TelloRC object.
-    #   Connects to the Tello.
-    #   Connects to all streams and begins all processes.
-    #   Returns True if all processes have been started.
-    def start(self):
+    def start(self) -> bool:
+        """
+        Connects to the Tello Drone.
+        :return: Returns true if the connection was successful, false otherwise.
+        """
         self.running = True
-        self.rc_process.start()
-        self.state_thread.start()
-        self.state_process.start()
-        self.video_thread.start()
-        self.video_process.start()
-        return True
+        if self.remote.connect() and self.remote.stream_on():
+            self.video.start()
+            self.state.start()
+            return True
+        return False
     
-    def control(self):
+    def control(self) -> None:
+        """
+        Starts the process of controlling the Tello Drone by keyboard RC control, including display of the video feed
+        and artificial horizon. Must be called AFTER start.
+        :return: None
+        """
         # Setup Pygame
-        screen = display.set_mode((960, 720))
+        screen = display.set_mode((1280, 720))
         display.set_caption("Tello HUD")
         # Setup
         key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'r': 0, 'f': 0}
         poll_timer = perf_counter()
         poll_delta = 1/30
-        pg_event.set_allowed([KEYDOWN])
+        pg_event.set_allowed([KEYDOWN, QUIT])
+        # Multithreading command execution to avoid frozen screen.
+        cmd_thread = None
         # Main Loop
         control_running = True
         while control_running:
             delta = perf_counter() - poll_timer
             if delta >= poll_delta:
                 self.__hud_update(screen)
+                if cmd_thread is not None and not self.remote.waiting_for_complete():
+                    cmd_thread.join()
+                    cmd_thread = None
                 poll_timer = perf_counter()
                 # Check for events
-                command_sent = False
                 for event in pg_event.get(KEYDOWN, QUIT):
                     if event.type == QUIT:
                         control_running = False
                     if event.type == KEYDOWN:
-                        if event.key == K_t:
-                            command_sent = True
-                            if not self.takeoff():
-                                print("Problem with takeoff!")
-                        elif event.key == K_l:
-                            command_sent = True
-                            if not self.land():
-                                print("Problem with landing!")
-                        elif event.key == K_ESCAPE:
-                            command_sent = True
-                            if not self.emergency():
-                                print("Problem with emergency shutdown!")
+                        if cmd_thread is None:
+                            if event.key == K_t:
+                                cmd_thread = Thread(target=self.remote.takeoff, daemon=True)
+                            elif event.key == K_l:
+                                cmd_thread = Thread(target=self.remote.land, daemon=True)
+                            elif event.key == K_UP:
+                                cmd_thread = Thread(target=self.remote.flip_forward, daemon=True)
+                            elif event.key == K_DOWN:
+                                cmd_thread = Thread(target=self.remote.flip_backward, daemon=True)
+                            elif event.key == K_RIGHT:
+                                cmd_thread = Thread(target=self.remote.flip_right, daemon=True)
+                            elif event.key == K_LEFT:
+                                cmd_thread = Thread(target=self.remote.flip_left, daemon=True)
+                        if event.key == K_ESCAPE:
+                            self.remote.emergency()
+                            control_running = False
                         elif event.key == K_BACKSPACE:
                             control_running = False
                         elif event.key == K_DELETE:
-                            self.rcQ.put((0, 0, 0, 0))
-                        elif event.key == K_UP:
-                            command_sent = True
-                            if not self.flip_forward():
-                                print("Problem with forward flip!")
-                        elif event.key == K_DOWN:
-                            command_sent = True
-                            if not self.flip_backward():
-                                print("Problem with backward flip!")
-                        elif event.key == K_RIGHT:
-                            command_sent = True
-                            if not self.flip_right():
-                                print("Problem with right flip!")
-                        elif event.key == K_LEFT:
-                            command_sent = True
-                            if not self.flip_left():
-                                print("Problem with left flip!")
-                if command_sent:
-                    poll_timer = perf_counter()
-                    continue
+                            self.remote.set_rc(0, 0, 0, 0)
                 # Deal with held keys
                 key_state = get_pressed()
                 for key in key_holds:
@@ -170,226 +144,53 @@ class TelloRC:
                     else:
                         key_holds[key] -= delta
                     key_holds[key] = max(0, min(self.vel_timing, key_holds[key]))
-                y = self.__vel_curve(key_holds['w']) - self.__vel_curve(key_holds['s'])
-                x = self.__vel_curve(key_holds['d']) - self.__vel_curve(key_holds['a'])
-                z = self.__vel_curve(key_holds['r']) - self.__vel_curve(key_holds['f'])
-                rot = self.__vel_curve(key_holds['e']) - self.__vel_curve(key_holds['q'])
-                if self.rcQ.empty():
-                    self.rcQ.put((int(x), int(y), int(z), int(rot)))
+                y = int(self.__vel_curve(key_holds['w']) - self.__vel_curve(key_holds['s']))
+                x = int(self.__vel_curve(key_holds['d']) - self.__vel_curve(key_holds['a']))
+                z = int(self.__vel_curve(key_holds['r']) - self.__vel_curve(key_holds['f']))
+                rot = int(self.__vel_curve(key_holds['e']) - self.__vel_curve(key_holds['q']))
+                self.remote.set_rc(x, y, z, rot)
+        if cmd_thread is not None:
+            cmd_thread.join()
     
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Closes down communication with the drone and writes the log to a file.
-    def close(self):
+    def close(self) -> None:
+        """
+        Closes communication with the Tello Drone.
+        :return: None
+        """
         self.running = False
-        if self.state_thread.is_alive():
-            self.state_thread.join()
-        if self.video_thread.is_alive():
-            self.video_thread.join()
-        if self.video_process.is_alive():
-            self.video_haltQ.put("halt")
-            TelloRC.__clear_q(self.video_recQ)
-            self.video_process.join()
-        if self.state_process.is_alive():
-            self.state_haltQ.put("halt")
-            TelloRC.__clear_q(self.state_recQ)
-            self.state_process.join()
-        if self.rc_process.is_alive():
-            self.rcQ.put("halt")
-            TelloRC.__clear_q(self.rc_confQ)
-            self.rc_process.join()
-
-    # ======================================
-    # COMMAND METHODS
-    # ======================================
-    # Section Notes:
-    #   All commands check to see if the drone has been connected and put into SDK mode before sending commands.
-
-    # Precond:
-    #   None.
-    #
-    # Postcond
-    #   Sends the takeoff command.
-    #   If a non-okay response is given returns False, otherwise returns true.
-    def takeoff(self):
-        self.rcQ.put("takeoff")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond
-    #   Sends the land command.
-    #   If a non-okay response is given returns False, otherwise returns true.
-    def land(self):
-        self.rcQ.put("land")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Sends the emergency command, in triplicate. Does not wait for response.
-    def emergency(self):
-        self.rcQ.put("emergency")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip l command to the command queue.
-    def flip_left(self):
-        self.rcQ.put("flip l")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip r command to the command queue.
-    def flip_right(self):
-        self.rcQ.put("flip r")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip f command to the command queue.
-    def flip_forward(self):
-        self.rcQ.put("flip f")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Adds flip b command to the command queue.
-    def flip_backward(self):
-        self.rcQ.put("flip b")
-        try:
-            conf = self.rc_confQ.get(block=True, timeout=5)
-            if not conf[0]:
-                return False
-        except Empty:
-            return False
-        return True
-
-    # ======================================
-    # Info METHODS
-    # ======================================
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Returns the last frame taken by the Tello.
-    #   Returns None if the stream is off.
-    def get_frame(self):
-        return self.last_frame
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Returns the last state received from the Tello as a dictionary.
-    def get_state(self):
-        return self.last_state
-
-    # ======================================
-    # PRIVATE METHODS
-    # ======================================
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Thread handling state extraction..
-    def __state_thread(self):
-        while self.running:
-            self.last_state = self.state_recQ.get()
-
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Thread handling video extraction.
-    def __video_thread(self):
-        while self.running:
-            self.last_frame = self.video_recQ.get()
-
-    # Precond:
-    #   q is a valid mp.Queue object.
-    #
-    # Postcond:
-    #   Clears the q and closes it.
-    def __clear_q(q: Queue):
-        try:
-            while not q.empty():
-                q.get_nowait()
-        except Empty:
-            pass
-        q.close()
+        self.state.close()
+        self.video.close()
+        self.remote.close()
     
-    # Precond:
-    #   t is a valid floating point value.
-    #
-    # Postcond:
-    #   Returns the current velocity based on how long a key has  been pressed.
-    def __vel_curve(self, t):
+    def __vel_curve(self, t: float) -> float:
+        """
+        Converts a time (s) into a throttle value.
+        :param t: A floating point number representing the number of seconds.
+        :return: A floating point value representing the throttle setting based on how long a control has been pressed.
+        """
         return 100 * (log1p(t) / log1p(self.vel_timing))
 
-    def __hud_update(self, screen):
+    def __hud_update(self, screen: Surface) -> None:
+        """
+        Updates the HUD graphic so that it represents the current video feed and state from the Tello Drone.
+        :param screen: The pygame surface of the display.
+        :return: None
+        """
+        last_state = self.state.get()
+        last_frame = self.video.get()
+        if last_frame is None or last_state is None:
+            return
         # Setup video loop basics
         horizon_rad = 50
         horizon_size = 4 * horizon_rad
         horizon_placement = ((screen.get_width() - horizon_size) // 2, (screen.get_height() - horizon_size) // 2)
         screen.fill((0, 0, 0, 255))
-        if self.last_frame is not None:
-            screen.blit(frombuffer(self.last_frame.tobytes(), self.last_frame.shape[1::-1], "BGR"), (0, 0))
-            if self.last_state is not None:
-                bat_text = self.hud_font.render(f"Battery: {self.last_state['bat']:4}", True, (0, 200, 0), (0, 0, 0))
-                height_text = self.hud_font.render(f"ToF: {self.last_state['tof']:4}", True, (0, 200, 0), (0, 0, 0))
-                horizon = self.__artificial_horizon(horizon_rad, int(self.last_state['pitch']), int(self.last_state['roll']))
+        if last_frame is not None:
+            screen.blit(frombuffer(last_frame.tobytes(), last_frame.shape[1::-1], "BGR"), (0, 0))
+            if last_state is not None:
+                bat_text = self.hud_font.render(f"Battery: {last_state['bat']:4}", True, (0, 200, 0), (0, 0, 0))
+                height_text = self.hud_font.render(f"ToF: {last_state['tof']:4}", True, (0, 200, 0), (0, 0, 0))
+                horizon = self.__artificial_horizon(horizon_rad, int(last_state['pitch']), int(last_state['roll']))
                 screen.blits([
                     (bat_text, (0, 0)),
                     (height_text, (0, bat_text.get_height())),
@@ -402,7 +203,14 @@ class TelloRC:
             screen.blit(init_text, (x, y))
         display.flip()
 
-    def __artificial_horizon(self, rad: int, pitch: int, roll: int):
+    def __artificial_horizon(self, rad: int, pitch: int, roll: int) -> Surface:
+        """
+        Renders an artificial horizon for the HUD.
+        :param rad: HUD radius.
+        :param pitch: Pitch of the Tello Drone in degrees.
+        :param roll: Roll of the Tello Drone in degrees.
+        :return: A surface containing the artificial horizon.
+        """
         result = Surface((4 * rad, 4 * rad), SRCALPHA, 32)
         result.blit(self.hud_base, (0, 0))
         center = Vector2(result.get_width() // 2, result.get_height() // 2)
