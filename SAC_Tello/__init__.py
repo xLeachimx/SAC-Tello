@@ -13,5 +13,5 @@ if not __pg.get_init():
 from .tello_drone import TelloDrone
 from .tello_hud import TelloHud
 from .tello_rc import TelloRC
-from .face_encoder import FaceEncoder
+from .face_recognition import FaceRecognizer
 from .tello_face_hud import TelloFaceHud

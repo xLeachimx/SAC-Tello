@@ -1,4 +1,4 @@
-# File: face_encoder.py
+# File: face_recognition.py
 # Author: Michael Huelsman
 # Copyright: Dr. Michael Andrew Huelsman 2023
 # License: GNU GPLv3
@@ -20,7 +20,7 @@ import cv2 as cv
 import os
 
 
-class FaceEncoder:
+class FaceRecognizer:
     # Face recognition setup
     # Dim: Width, Height
     _TELLO_RES = (960, 720)
@@ -38,7 +38,7 @@ class FaceEncoder:
 
     def __init__(self, load_file=None):
         """
-        FaceEncoder class constructor
+        FaceRecognizer class constructor
         :param load_file:
             Name of the file to load encoded faces from (optional.)
         """
@@ -84,7 +84,7 @@ class FaceEncoder:
             return []
         if len(self.encodings.keys()) == 0:
             idents = ['Unknown' for i in range(len(face_locations))]
-            face_boxes = list(map(FaceEncoder.__extract_face_boxes, face_locations))
+            face_boxes = list(map(FaceRecognizer.__extract_face_boxes, face_locations))
             return list(zip(idents, face_boxes))
         encodings = []
         for location in face_locations:

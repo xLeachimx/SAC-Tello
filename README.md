@@ -133,26 +133,29 @@ active you will need to deactivate before your program ends.
 
 Another feature provided by SAC-Tello is access to face recognition via the
 tello's camera. In order to access the face recognition we must first make
-a `FaceEncoder` object. `FaceEncoder` objects take images and names and log
+a `FaceRecognizer` object. `FaceRecognizer` objects take images and names and log
 a person's facial characteristics for later comparison. To register a face
 with the encoder we need to call the `encode_face` method and give it a name
 and the filename of a image containing that person's face. For example:
 
 ```python
-from SAC_Tello import FaceEncoder
+from SAC_Tello import FaceRecognizer
+
 if __name__ == '__main__':
-    face_encoder = FaceEncoder()
+    face_encoder = FaceRecognizer()
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
 ```
 
-Once we have given all the faces we want to recognize to the `FaceEncoder`
+Once we have given all the faces we want to recognize to the `FaceRecognizer`
 object we can pass in the current camera frame from the tello drone. The
 example below simply lists out the names of all people detected by the drone.
+
 ```python
-from SAC_Tello import FaceEncoder
+from SAC_Tello import FaceRecognizer
 from SAC_Tello import TelloDrone
+
 if __name__ == '__main__':
-    face_encoder = FaceEncoder()
+    face_encoder = FaceRecognizer()
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
     drone = TelloDrone()
     drone.start()
@@ -172,11 +175,12 @@ will allow for commands based control of the Tello while streaming video that
 recognizes faces and displays names:
 
 ```python
-from SAC_Tello import FaceEncoder
+from SAC_Tello import FaceRecognizer
 from SAC_Tello import TelloDrone
 from SAC_Tello import TelloFaceHud
+
 if __name__ == '__main__':
-    face_encoder = FaceEncoder()
+    face_encoder = FaceRecognizer()
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
     drone = TelloDrone()
     hud = TelloFaceHud(drone, face_encoder)
@@ -188,23 +192,24 @@ if __name__ == '__main__':
     drone.close()
 ```
 
-Since encoding faces can take a long time the `FaceEncoder` class gives the
+Since encoding faces can take a long time the `FaceRecognizer` class gives the
 ability to save and load a set of encodings. Consider the following block of
 code:
 
 ```python
-from SAC_Tello import FaceEncoder
+from SAC_Tello import FaceRecognizer
+
 if __name__ == '__main__':
-    face_encoder = FaceEncoder()
+    face_encoder = FaceRecognizer()
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
     # Saves the encodings.
     face_encoder.save("my_encodings.enc")
-    another_encoder = FaceEncoder()
+    another_encoder = FaceRecognizer()
     another_encoder.load("my_encodings.enc")
 ```
 
 This code saves the encodings computed in the first `FaceEndocer` object to the
-file `my_encodings.enc` and then loads them into another `FaceEncoder` object.
+file `my_encodings.enc` and then loads them into another `FaceRecognizer` object.
 
 If you are going to encode many faces for use with the Tello we suggest you write
 a separate program which encodes all the faces you desire and saves that
@@ -221,7 +226,7 @@ the accuracy of face recognition.
 faces first, then use them.
 - As encoding faces takes a long time, it is recommended to encode first, then
 connect to the drone as encoding time may exceed the drone's auto-shutoff limit.
-- If a `FaceEncoder` object detects a face it does not recognize it will
+- If a `FaceRecognizer` object detects a face it does not recognize it will
 attribute the name `unknown` to it.
 - With recent update (>= version 0.1.1) detection is capable of realtime performance
 30fps, with reasonable hardware.

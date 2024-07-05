@@ -9,7 +9,7 @@
 #       Changed to multi-threaded single process.
 
 from .tello_drone import TelloDrone
-from .face_encoder import FaceEncoder
+from .face_recognition import FaceRecognizer
 from time import perf_counter
 from pygame import display, draw, event, Rect, QUIT
 from pygame.font import Font, get_default_font
@@ -21,11 +21,11 @@ class TelloFaceHud:
     """
     Class for creating and displaying a HUD which overlays Tello Video footage with face recognition.
     """
-    def __init__(self, drone: TelloDrone, faces: FaceEncoder):
+    def __init__(self, drone: TelloDrone, faces: FaceRecognizer):
         """
         Constructor for the TelloFaceHud class. Does not automatically connect to Tello Drone or start display.
         :param drone: A valid TelloDrone object which has been started.
-        :param faces: A valid FaceEncoder object.
+        :param faces: A valid FaceRecognizer object.
         """
         self.drone = drone
         self.encoder = faces
@@ -98,8 +98,8 @@ class TelloFaceHud:
     @staticmethod
     def __convert_rect(rect: list[int]) -> Rect:
         """
-        Converts the rectangle given by a FaceEncoder object into a Pygame Rectangle.
-        :param rect: A valid rectangle as given by a FaceEncoder object.
+        Converts the rectangle given by a FaceRecognizer object into a Pygame Rectangle.
+        :param rect: A valid rectangle as given by a FaceRecognizer object.
         :return: Returns the equivalent Pygame rectangle.
         """
         return Rect(rect[0], rect[1], rect[3], rect[2])
