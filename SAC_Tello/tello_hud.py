@@ -6,9 +6,10 @@
 # Purpose:
 #   A simple hud program that can be run on a separate thread.
 # Notes:
+#   Update 4 July 2024:
+#       Changed to multi-threaded single process.
 
 from .tello_drone import TelloDrone
-from .tello_rc import TelloRC
 from time import perf_counter, sleep
 from pygame import display, draw, event, Surface, Vector2, QUIT, SRCALPHA, KEYDOWN, K_p
 from pygame.font import Font, get_default_font
@@ -20,7 +21,14 @@ from cv2 import imwrite
 
 
 class TelloHud:
-    def __init__(self, drone: TelloDrone | TelloRC):
+    """
+    A class for creating a HUD for the Tello which runs independent of the Tello.
+    """
+    def __init__(self, drone: TelloDrone):
+        """
+        TelloHUd constructor.
+        :param drone: A valid TelloDrone object which provides both video and state information for the HUD.
+        """
         self.drone = drone
         self.running = False
         self.hud_thread = Thread(target=self.__hud_stream)
@@ -51,7 +59,11 @@ class TelloHud:
                   (hud_center.x + (self.hud_rad // 2), hud_center.y),
                   (hud_center.x + self.hud_rad - (self.hud_rad // 10), hud_center.y), 6)
     
-    def activate_hud(self):
+    def activate_hud(self) -> None:
+        """
+        Starts the HUD.
+        :return: None
+        """
         if self.running:
             return
         self.running = True
@@ -59,7 +71,11 @@ class TelloHud:
         while self.drone.get_frame() is None:
             sleep(1)
     
-    def deactivate_hud(self):
+    def deactivate_hud(self) -> None:
+        """
+        Stops the HUD.
+        :return: None
+        """
         if not self.running:
             if self.hud_thread.is_alive():
                 self.hud_thread.join()
@@ -67,10 +83,18 @@ class TelloHud:
         self.running = False
         self.hud_thread.join()
     
-    def is_active(self):
+    def is_active(self) -> bool:
+        """
+        Checks if the HUD is currently active.
+        :return: Returns true if the HUD is currently running.
+        """
         return self.running
     
-    def __hud_stream(self):
+    def __hud_stream(self) -> None:
+        """
+        Private method which runs in its own thread to display the HUD.
+        :return: None
+        """
         # Setup Pygame
         screen = display.set_mode((960, 720))
         display.set_caption("Tello HUD")
@@ -114,8 +138,14 @@ class TelloHud:
                         filename = str(uuid.uuid4()) + '.jpg'
                         imwrite(filename, frame)
                         
-    
-    def __artificial_horizon(self, rad: int, pitch: int, roll: int):
+    def __artificial_horizon(self, rad: int, pitch: int, roll: int) -> Surface:
+        """
+        Renders an artificial horizon for the HUD.
+        :param rad: HUD radius.
+        :param pitch: Pitch of the Tello Drone in degrees.
+        :param roll: Roll of the Tello Drone in degrees.
+        :return: A surface containing the artificial horizon.
+        """
         result = Surface((4 * rad, 4 * rad), SRCALPHA, 32)
         result.blit(self.hud_base, (0, 0))
         center = Vector2(result.get_width() // 2, result.get_height() // 2)
