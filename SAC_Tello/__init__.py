@@ -15,3 +15,5 @@ from .tello_hud import TelloHud
 from .tello_rc import TelloRC
 from .face_recognition import FaceRecognizer
 from .tello_face_hud import TelloFaceHud
+from .aruco_detector import ArucoDetector
+from .tello_aruco_hud import TelloArucoHud

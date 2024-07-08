@@ -35,7 +35,9 @@ often this due to external non-python build tools being needed, for example
 `opencv-python` needs C++ build tools from Visual Studio to properly install on
 Windows.
 
-# How To Use (Older version <= 0.1.1)
+# How To Use
+
+**If you are using an older version (< 1.1):**
 
 Since this package spawns multiple child processes any use of the package must originate from
 a protected starting point (i.e. `if __name__ == __main__:`) or else a Runtime Error **will**
