@@ -19,15 +19,9 @@ import cv2
 
 
 def drive_tello():
-    face_recog = FaceRecognizer()
-    drone = TelloDrone()
-    hud = TelloArucoHud(drone)
-    if not drone.start():
-        print("Problem connecting.")
-        return False
-    hud.start()
-    sleep(10)
-    hud.stop()
+    drone = TelloRC()
+    drone.start()
+    drone.control()
     drone.close()
 
     

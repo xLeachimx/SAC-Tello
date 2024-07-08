@@ -92,44 +92,39 @@ class TelloRC:
         :return: None
         """
         # Setup Pygame
-        screen = display.set_mode((1280, 720))
+        screen = display.set_mode((960, 720))
         display.set_caption("Tello HUD")
         # Setup
         key_holds = {'w': 0, 's': 0, 'd': 0, 'a': 0, 'q': 0, 'e': 0, 'r': 0, 'f': 0}
         poll_timer = perf_counter()
         poll_delta = 1/30
         pg_event.set_allowed([KEYDOWN, QUIT])
-        # Multithreading command execution to avoid frozen screen.
-        cmd_thread = None
         # Main Loop
         control_running = True
+        self.remote.stream_on()
         while control_running:
             delta = perf_counter() - poll_timer
             if delta >= poll_delta:
                 self.__hud_update(screen)
-                if cmd_thread is not None and not self.remote.waiting_for_complete():
-                    cmd_thread.join()
-                    cmd_thread = None
                 poll_timer = perf_counter()
                 # Check for events
                 for event in pg_event.get(KEYDOWN, QUIT):
                     if event.type == QUIT:
                         control_running = False
                     if event.type == KEYDOWN:
-                        if cmd_thread is None:
-                            if event.key == K_t:
-                                cmd_thread = Thread(target=self.remote.takeoff, daemon=True)
-                            elif event.key == K_l:
-                                cmd_thread = Thread(target=self.remote.land, daemon=True)
-                            elif event.key == K_UP:
-                                cmd_thread = Thread(target=self.remote.flip_forward, daemon=True)
-                            elif event.key == K_DOWN:
-                                cmd_thread = Thread(target=self.remote.flip_backward, daemon=True)
-                            elif event.key == K_RIGHT:
-                                cmd_thread = Thread(target=self.remote.flip_right, daemon=True)
-                            elif event.key == K_LEFT:
-                                cmd_thread = Thread(target=self.remote.flip_left, daemon=True)
-                        if event.key == K_ESCAPE:
+                        if event.key == K_t:
+                            self.remote.takeoff()
+                        elif event.key == K_l:
+                            self.remote.land()
+                        elif event.key == K_UP:
+                            self.remote.flip_forward()
+                        elif event.key == K_DOWN:
+                            self.remote.flip_backward()
+                        elif event.key == K_RIGHT:
+                            self.remote.flip_right()
+                        elif event.key == K_LEFT:
+                            self.remote.flip_left()
+                        elif event.key == K_ESCAPE:
                             self.remote.emergency()
                             control_running = False
                         elif event.key == K_BACKSPACE:
@@ -149,9 +144,7 @@ class TelloRC:
                 z = int(self.__vel_curve(key_holds['r']) - self.__vel_curve(key_holds['f']))
                 rot = int(self.__vel_curve(key_holds['e']) - self.__vel_curve(key_holds['q']))
                 self.remote.set_rc(x, y, z, rot)
-        if cmd_thread is not None:
-            cmd_thread.join()
-    
+
     def close(self) -> None:
         """
         Closes communication with the Tello Drone.

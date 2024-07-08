@@ -53,6 +53,8 @@ class TelloDrone:
             self.state.start()
             self.state_update_thread.start()
             self.video_update_thread.start()
+            while self.last_frame is None and self.last_state is None:
+                sleep(0.1)
             return True
         return False
 
