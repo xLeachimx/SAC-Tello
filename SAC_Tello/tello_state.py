@@ -110,6 +110,6 @@ class TelloState:
                 self.state_log.append((state, state_time))
                 self.new_state = True
             except OSError as exc:
-                if not self.stop:
+                if self.active:
                     print("Caught exception socket.error : %s" % exc)
                     
