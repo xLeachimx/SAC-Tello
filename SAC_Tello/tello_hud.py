@@ -8,12 +8,11 @@
 # Notes:
 #   Update 4 July 2024:
 #       Changed to multi-threaded single process.
+#   Update 8 July 2024:
+#       Revert to multiprocessing due to lack of thread safe display option
 
 from .tello_drone import TelloDrone
-from .tello_video import TelloVideo
-from .tello_state import TelloState
-from time import perf_counter, sleep
-import pygame as pg
+from time import perf_counter
 from pygame import display, draw, event, Surface, Vector2, QUIT, SRCALPHA, KEYDOWN, K_p
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer
@@ -23,7 +22,6 @@ import uuid
 from cv2 import imwrite
 import multiprocessing as mp
 from queue import Empty
-import numpy as np
 
 def __artificial_horizon(rad: int, pitch: int, roll: int, hud_base: Surface) -> Surface:
         """
@@ -173,6 +171,8 @@ class TelloHud:
         self.halt_q: mp.Queue | None = None
 
     def start(self) -> None:
+        if self.running:
+            return
         self.running = True
         self.state_q = mp.Queue()
         self.frame_q = mp.Queue()
@@ -204,7 +204,6 @@ class TelloHud:
         while not self.halt_q.empty():
             self.halt_q.get()
         timer = perf_counter()
-        delta = 0
         if self.hud_proc is not None:
             self.hud_proc.start()
         while self.running:

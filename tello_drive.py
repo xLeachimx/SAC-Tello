@@ -12,13 +12,16 @@ from SAC_Tello import TelloDrone
 from SAC_Tello import TelloHud
 from SAC_Tello import TelloFaceHud
 from SAC_Tello import FaceRecognizer
+from SAC_Tello import ArucoDetector
+from SAC_Tello import TelloArucoHud
 from time import sleep
 import cv2
 
 
 def drive_tello():
+    face_recog = FaceRecognizer()
     drone = TelloDrone()
-    hud = TelloHud(drone)
+    hud = TelloArucoHud(drone)
     if not drone.start():
         print("Problem connecting.")
         return False

@@ -37,8 +37,9 @@ class ArucoDetector:
         """
         ArucoDetector class constructor
         """
-        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_ARUCO_ORIGINAL)
-        self.aruco_params = aruco.DetectorParameters_create()
+        self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_ARUCO_ORIGINAL)
+        self.aruco_params = aruco.DetectorParameters()
+        self.detector = aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
     
     def detect_markers(self, img: np.ndarray) -> list:
         """
@@ -51,26 +52,29 @@ class ArucoDetector:
         """
         # convert image to gray scale for ease of use/speed.
         img = cv.cvtColor(cv.resize(img, self._TELLO_RES), cv.COLOR_BGR2GRAY)
-        corners, ids, rejected_points = aruco.detectMarkers(img, self.aruco_dict, parameters=self.aruco_params)
+        corners, ids, rejected_points = self.detector.detectMarkers(img)
         detected_markers = []
+        if len(corners) == 0:
+            return detected_markers
         for location, num in zip(corners, ids):
-            pose = aruco.estimatePoseSingleMarkers(location, self._MARKER_SIZE_CM, self._CAMERA_PARAMETERS,
-                                                   self._DISTORTION_PARAMETERS)
-            translation = pose[1]
-            distance = int(np.linalg.norm(translation))
-            detected_markers.append((num, ArucoDetector.__convert_corners_to_rect(location), distance))
+            # pose = aruco.estimatePoseSingleMarkers(location, self._MARKER_SIZE_CM, self._CAMERA_PARAMETERS,
+            #                                        self._DISTORTION_PARAMETERS)
+            # translation = pose[1]
+            # distance = int(np.linalg.norm(translation))
+            detected_markers.append((num, ArucoDetector.__convert_corners_to_rect(location), -1))
         return detected_markers
 
     @staticmethod
-    def __convert_corners_to_rect(location: list[int]):
+    def __convert_corners_to_rect(location: list):
         """
         Converts a set of 4 corners to a rectangle in configuration (top, left, height, width)
         :param location: A list containing 4 coordinate pairs.
         :return: Returns the (top, left, height, width) of the given corner defined rectangle.
         """
-        left = min(map(lambda x: x[0], location))
-        right = max(map(lambda x: x[0], location))
-        top = min(map(lambda x: x[1], location))
-        bottom = max(map(lambda x: x[1], location))
+        location = location[0]
+        left = int(min(map(lambda x: x[1], location)))
+        right = int(max(map(lambda x: x[1], location)))
+        top = int(min(map(lambda x: x[0], location)))
+        bottom = int(max(map(lambda x: x[0], location)))
         return top, left, bottom-top, right-left
         
