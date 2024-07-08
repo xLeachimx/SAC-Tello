@@ -17,16 +17,14 @@ import cv2
 
 
 def drive_tello():
-    encoder = FaceRecognizer()
     drone = TelloDrone()
+    hud = TelloHud(drone)
     if not drone.start():
         print("Problem connecting.")
         return False
-    hud = TelloFaceHud(drone, encoder)
-    hud.activate_hud()
-    while hud.is_active():
-        sleep(1)
-    hud.deactivate_hud()
+    hud.start()
+    sleep(10)
+    hud.stop()
     drone.close()
 
     

@@ -14,6 +14,7 @@
 
 from threading import Thread
 import numpy as np
+from time import sleep, perf_counter
 
 from .tello_cmd import TelloCmd
 from .tello_state import TelloState
@@ -240,8 +241,9 @@ class TelloDrone:
         :return: None.
         """
         while self.running:
-           if self.state.has_state():
-               self.last_state = self.state.get()
+            if self.state.has_state():
+                self.last_state = self.state.get()
+                sleep(1/60)
 
     def __video_update_thread(self) -> None:
         """
@@ -251,3 +253,4 @@ class TelloDrone:
         while self.running:
             if self.video.has_frame():
                 self.last_frame = self.video.get()
+                sleep(1/60)

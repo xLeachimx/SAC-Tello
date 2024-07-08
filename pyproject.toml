@@ -7,9 +7,9 @@ exclude = [
 ]
 [project]
 name = "SAC-Tello"
-version = "0.1.1"
+version = "0.1.2"
 authors = [
-  { name="Michael Huelsman", email="michael.huelsman@gmail.com" },
+  {name="Michael Huelsman", email="michael.huelsman@gmail.com"},
 ]
 description = "A Python-based DJI Tello interface. Created primaily for educational use."
 readme = "README.md"

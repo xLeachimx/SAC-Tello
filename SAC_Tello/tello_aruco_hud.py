@@ -9,6 +9,7 @@
 from .tello_drone import TelloDrone
 from .aruco_detector import ArucoDetector
 from time import perf_counter
+import pygame as pg
 from pygame import display, draw, event, Rect, QUIT
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer

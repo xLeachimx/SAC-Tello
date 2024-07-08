@@ -23,7 +23,7 @@ import os
 class FaceRecognizer:
     # Face recognition setup
     # Dim: Width, Height
-    _TELLO_RES = (1280, 720)
+    _TELLO_RES = (960, 720)
     
     _file_location = os.path.dirname(os.path.abspath(__file__))
     
