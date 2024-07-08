@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.23.4",
-    "opencv-python>=4.6.0.66",
+    "opencv-python>=4.10.0.84",
     "pygame>=2.5.0",
 ]
 [project.urls]
