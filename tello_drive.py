@@ -11,12 +11,13 @@ from SAC_Tello import TelloRC
 from SAC_Tello import TelloDrone
 from SAC_Tello import TelloHud
 from SAC_Tello import TelloFaceHud
-from SAC_Tello import FaceEncoder
+from SAC_Tello import FaceRecognizer
 from time import sleep
+import cv2
 
 
 def drive_tello():
-    encoder = FaceEncoder()
+    encoder = FaceRecognizer()
     drone = TelloDrone()
     if not drone.start():
         print("Problem connecting.")

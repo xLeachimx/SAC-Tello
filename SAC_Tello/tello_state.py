@@ -4,97 +4,77 @@
 # License: GNU GPLv3
 # Created On: 26 Jun 2023
 # Purpose:
-#   A class and function for managing getting the state of a Tello in a separate process.
+#   A class and function for managing getting the state of a Tello.
 # Notes:
-#   This is intended for use in a multiprocessing capacity.
-#   Start by running tello_state_loop as the target of a Process object.
-#
-#   Two multiprocessing queues are used:
-#       halt_q: Used by the parent to send commands to the state gatherer.
-#               Commands should be sent as a single string.
-#       conf_q: Used by the child to send the next state gathered from the Tello.
-#
-#   Commands (case insensitive) accepted:
-#       halt: Stops the process and closes the management object.
+# Update 27 June 2024:
+#   Changed to multi-threaded single process.
 
 from socket import socket, AF_INET, SOCK_DGRAM
 from threading import Thread
 from time import perf_counter
 from datetime import datetime
-from multiprocessing import Queue
-from queue import Empty
 import os
-
-
-def tello_state_loop(halt_q: Queue, state_q: Queue):
-    # Create a management object.
-    manager = TelloState()
-    manager.start()
-    running = True
-    while running:
-        try:
-            if not halt_q.empty():
-                halt = str(halt_q.get(False))
-                if halt.lower() == 'halt':
-                    break
-        except Empty:
-            pass
-        if state_q.empty():
-            state = manager.get()
-            if state is not None:
-                state_q.put(state)
-    try:
-        while not state_q.empty():
-            state_q.get_nowait()
-    except Empty:
-        pass
-    state_q.close()
-    manager.close()
     
 
-# Class for handling receiving the state information from a Tello.
 class TelloState:
+    """
+    Class for handling receiving and logging state information from a Tello Drone.
+    """
     def __init__(self):
+        """
+        TelloState class constructor. Sets up connection to the Tello to listen for state information.
+        """
         # Running info
-        self.stop = False
+        self.active = False
         self.mission_start = perf_counter()
+        self.new_state = False
 
         # Connecting to current state information
         self.state_addr = ('192.168.10.1', 8890)
         self.local_state_addr = ('', 8890)
         self.state_channel = socket(AF_INET, SOCK_DGRAM)
         self.state_channel.bind(self.local_state_addr)
-        self.state_log = [[None]]
+        self.state_log = []
     
         self.receive_state_thread = Thread(target=self.__receive)
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Starts the state receiving thread.
     def start(self):
-        self.mission_start = perf_counter()
-        self.receive_state_thread.start()
+        """
+        Starts the process of receiving state packets from the Tello drone.
+        :return: None.
+        """
+        if not self.active:
+            self.active = True
+            self.mission_start = perf_counter()
+            self.receive_state_thread.start()
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Non-blocking function.
-    #   Returns the next state
-    #   If no new state has been received then None is returned.
-    def get(self):
+    def get(self) -> dict | None:
+        """
+        Retrieves the last received states.
+        :return: Returns a dictionary (str -> str) of the state values. Returns None if no state has been logged or the
+        object is not actively receiving state updates.
+        """
+        if not self.active or len(self.state_log) == 0:
+            return None
+        self.new_state = False
         return self.state_log[-1][0]
     
-    # Precond:
-    #   fldr is a string containing the path to the folder to place the log file..
-    #
-    # Postcond:
-    #   Closes the threads and various channel.
-    #   Writes out log data.
+    def has_state(self):
+        """
+        Method for detecting if a non-retrieved state exists.
+        :return: Returns true if a state has been logged, but not retrieval calls have been made since.
+        """
+        return self.new_state
+    
     def close(self, fldr: str = "logs"):
-        self.stop = True
+        """
+        Closes the receiving stream and logs the data to the provided directory.
+        :param fldr:
+            fldr is a string containing the path to the directory where the log is to be written.
+        :return:
+            None.
+        """
+        self.active = False
         self.state_channel.close()
         self.receive_state_thread.join()
         t = datetime.now()
@@ -108,13 +88,13 @@ class TelloState:
                 print("Mission Time(s):", round(entry[1], 3), file=fout)
                 print("State:", entry[0], file=fout)
 
-    # Precond:
-    #   None.
-    #
-    # Postcond:
-    #   Receives states messages from the Tello and logs them.
     def __receive(self):
-        while not self.stop:
+        """
+        Private method for handling (in a separate thread) receiving state information from the Tello Drone.
+        :return:
+            None
+        """
+        while self.active:
             try:
                 response, ip = self.state_channel.recvfrom(1024)
                 response = response.decode('utf-8')
@@ -128,6 +108,7 @@ class TelloState:
                     state[label] = val
                 state_time = perf_counter() - self.mission_start
                 self.state_log.append((state, state_time))
+                self.new_state = True
             except OSError as exc:
                 if not self.stop:
                     print("Caught exception socket.error : %s" % exc)
