@@ -37,8 +37,6 @@ Windows.
 
 # How To Use
 
-**If you are using an older version (< 1.1):**
-
 Since this package spawns multiple child processes any use of the package must originate from
 a protected starting point (i.e. `if __name__ == __main__:`) or else a Runtime Error **will**
 occur.
@@ -115,8 +113,8 @@ if __name__ == '__main__':
     drone = TelloDrone()
     hud = TelloHud(drone)
     drone.start()
-    hud.activate_hud()
-    hud.deactivate_hud()
+    hud.start()
+    hud.stop()
     drone.close()
 ```
 
@@ -186,11 +184,11 @@ if __name__ == '__main__':
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
     drone = TelloDrone()
     hud = TelloFaceHud(drone, face_encoder)
-    hud.activate_hud()
+    hud.start()
     drone.takeoff()
     # insert drone flight commands here
     drone.land()
-    hud.deactivate_hud()
+    hud.stop()
     drone.close()
 ```
 
@@ -236,6 +234,53 @@ attribute the name `unknown` to it.
 designed for speed of recognition, however performance degrades with number of faces
 in frame and number of faces registered.
 - Face recognition in this package not entirely reliable and results may vary.
+
+## Tello Aruco Detection
+
+Another feature provided by SAC-Tello is access to aruco marker detection via the openCV
+aruco library. In order to access the aruco detection we must first make a `ArucoDetector`
+object. `ArucoDetector` objects take image and convert them into the corresponding ids,
+frame locations, and distances (pending.) The example below simply lists out the ids and
+locations of all aruco markers detected by the drone.
+
+```python
+from SAC_Tello import ArucoDetector
+from SAC_Tello import TelloDrone
+
+if __name__ == '__main__':
+    aruco_detector = ArucoDetector()
+    drone = TelloDrone()
+    drone.start()
+    while drone.get_frame() is None:
+        pass
+    markers = aruco_detector.detect_markers(drone.get_frame())
+    for id, location, distance in markers:
+        print(f"Marker with value {id} is in rectangle {location}")
+    drone.close()
+```
+
+Of course this only looks at the first frame from the camera. To make it easier
+to see the aruco detection in action SAC-Tello provides a aruco detection version
+of the heads-up display. This is contained in the `TelloArucoHud` class
+and works similarly to the `TelloHud` class. For example the following code
+will allow for commands based control of the Tello while streaming video that
+detects aruco markers:
+
+```python
+from SAC_Tello import TelloDrone
+from SAC_Tello import TelloArucoHud
+
+if __name__ == '__main__':
+    drone = TelloDrone()
+    hud = TelloArucoHud(drone)
+    hud.start()
+    drone.takeoff()
+    # insert drone flight commands here
+    drone.land()
+    hud.stop()
+    drone.close()
+```
+
 
 ## Tello Remote Control
 
