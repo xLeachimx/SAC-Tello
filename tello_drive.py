@@ -19,9 +19,12 @@ import cv2
 
 
 def drive_tello():
-    drone = TelloRC()
+    drone = TelloDrone()
+    hud = TelloArucoHud(drone)
     drone.start()
-    drone.control()
+    hud.start()
+    sleep(20)
+    hud.stop()
     drone.close()
 
     

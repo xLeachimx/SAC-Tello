@@ -184,6 +184,7 @@ if __name__ == '__main__':
     face_encoder.encode_face("Jim", "jim_selfie.jpg")
     drone = TelloDrone()
     hud = TelloFaceHud(drone, face_encoder)
+    drone.start()
     hud.start()
     drone.takeoff()
     # insert drone flight commands here
@@ -273,6 +274,7 @@ from SAC_Tello import TelloArucoHud
 if __name__ == '__main__':
     drone = TelloDrone()
     hud = TelloArucoHud(drone)
+    drone.start()
     hud.start()
     drone.takeoff()
     # insert drone flight commands here

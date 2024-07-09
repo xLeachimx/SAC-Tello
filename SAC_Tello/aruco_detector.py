@@ -31,7 +31,7 @@ class ArucoDetector:
                                       0.000000])
     _MARKER_SIZE_CM = 8.89
 
-    _TELLO_RES = (1280, 720)
+    _TELLO_RES = (960, 720)
 
     def __init__(self):
         """
@@ -72,9 +72,9 @@ class ArucoDetector:
         :return: Returns the (top, left, height, width) of the given corner defined rectangle.
         """
         location = location[0]
-        left = int(min(map(lambda x: x[1], location)))
-        right = int(max(map(lambda x: x[1], location)))
-        top = int(min(map(lambda x: x[0], location)))
-        bottom = int(max(map(lambda x: x[0], location)))
+        left = int(min(map(lambda x: x[0], location)))
+        right = int(max(map(lambda x: x[0], location)))
+        top = int(min(map(lambda x: x[1], location)))
+        bottom = int(max(map(lambda x: x[1], location)))
         return top, left, bottom-top, right-left
         
