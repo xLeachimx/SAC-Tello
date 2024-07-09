@@ -12,7 +12,7 @@
 #       Revert to multiprocessing due to lack of thread safe display option
 
 from .tello_drone import TelloDrone
-from time import perf_counter
+from time import perf_counter, sleep
 from pygame import display, draw, event, Surface, Vector2, QUIT, SRCALPHA, KEYDOWN, K_p
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer
@@ -150,6 +150,8 @@ def hud_render_loop(state_q: mp.Queue, frame_q: mp.Queue, halt_q: mp.Queue):
                 if evt.key == K_p:
                     filename = str(uuid.uuid4()) + '.jpg'
                     imwrite(filename, frame)
+    display.quit()
+    print("Done!")
 
 class TelloHud:
     """
@@ -215,6 +217,15 @@ class TelloHud:
                 if self.state_q.empty():
                     self.state_q.put(self.drone.get_state())
         self.halt_q.put("HALT")
-        self.hud_proc.join(3)
+        self.hud_proc.join()
+        while not self.state_q.empty():
+            self.state_q.get()
+        while not self.frame_q.empty():
+            self.frame_q.get()
+        while not self.halt_q.empty():
+            self.halt_q.get()
+        self.frame_q.close()
+        self.state_q.close()
+        self.halt_q.close()
         if self.hud_proc.is_alive():
             self.hud_proc.kill()

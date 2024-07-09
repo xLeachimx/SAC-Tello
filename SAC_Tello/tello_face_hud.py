@@ -12,7 +12,7 @@
 
 from .tello_drone import TelloDrone
 from .face_recognition import FaceRecognizer
-from time import perf_counter
+from time import perf_counter, sleep
 from pygame import display, draw, event, Rect, QUIT
 from pygame.font import Font, get_default_font
 from pygame.image import frombuffer
@@ -129,5 +129,11 @@ class TelloFaceHud:
                     self.frame_q.put(self.drone.get_frame())
         self.halt_q.put("HALT")
         self.hud_proc.join(3)
+        while not self.frame_q.empty():
+            self.frame_q.get()
+        while not self.halt_q.empty():
+            self.halt_q.get()
+        self.frame_q.close()
+        self.halt_q.close()
         if self.hud_proc.is_alive():
             self.hud_proc.kill()

@@ -23,7 +23,7 @@ def drive_tello():
     hud = TelloArucoHud(drone)
     drone.start()
     hud.start()
-    sleep(20)
+    sleep(6)
     hud.stop()
     drone.close()
 
