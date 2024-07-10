@@ -20,13 +20,15 @@ import cv2
 
 def drive_tello():
     drone = TelloDrone()
-    recognizer = FaceRecognizer()
-    recognizer.encode_face("Dr. H", "DrH1.jpg")
-    hud = TelloFaceHud(drone, recognizer)
+    # recognizer = FaceRecognizer()
+    # recognizer.encode_face("Dr. H", "DrH1.jpg")
+    # hud = TelloFaceHud(drone, recognizer)
     drone.start()
-    hud.start()
+    # hud.start()
     sleep(6)
-    hud.stop()
+    print("Cheese")
+    drone.take_pic()
+    # hud.stop()
     drone.close()
 
     

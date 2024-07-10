@@ -15,6 +15,8 @@
 from threading import Thread
 import numpy as np
 from time import sleep, perf_counter
+import cv2 as cv
+import uuid
 
 from .tello_cmd import TelloCmd
 from .tello_state import TelloState
@@ -232,6 +234,17 @@ class TelloDrone:
         :return: Returns the last state as a dictionary (str -> str). If no state exists returns None instead.
         """
         return self.last_state
+
+    def take_pic(self, name: str | None = None) -> str:
+        """
+        Takes the last frame and saves it to the file with the given name.
+        :param name: String containing the filename to store the image at, if none one will be auto-generated.
+        :return: The filename where the image was stored.
+        """
+        if name is None:
+            name = str(uuid.uuid4()) + '.jpg'
+        cv.imwrite(name, self.last_frame)
+        return name
 
     # ======================================
     # PRIVATE METHODS
