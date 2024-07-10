@@ -26,6 +26,7 @@ def __convert_rect(rect: list[int]) -> Rect:
         :param rect: A valid rectangle as given by a FaceRecognizer object.
         :return: Returns the equivalent Pygame rectangle.
         """
+        print(rect)
         return Rect(rect[0], rect[1], rect[3], rect[2])
 def face_hud_render_loop(frame_q: mp.Queue, halt_q: mp.Queue, encoder: FaceRecognizer):
     # Setup Pygame

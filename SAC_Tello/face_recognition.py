@@ -43,6 +43,7 @@ class FaceRecognizer:
             Name of the file to load encoded faces from (optional.)
         """
         self.encodings = {}
+        self._face_detector.setInputSize(self._TELLO_RES)
         if load_file is not None:
             self.load(load_file)
 
@@ -82,15 +83,15 @@ class FaceRecognizer:
         face_locations = self.__find_faces(img)
         if len(face_locations) == 0:
             return []
+        face_boxes = list(map(FaceRecognizer.__extract_face_boxes, face_locations))
         if len(self.encodings.keys()) == 0:
             idents = ['Unknown' for i in range(len(face_locations))]
-            face_boxes = list(map(FaceRecognizer.__extract_face_boxes, face_locations))
             return list(zip(idents, face_boxes))
         encodings = []
         for location in face_locations:
             encodings.append(self.__encode_face(img, location))
         idents = list(map(self.__match_face, encodings))
-        return list(zip(idents, face_locations))
+        return list(zip(idents, face_boxes))
 
     def load(self, filename: str):
         """
@@ -136,7 +137,7 @@ class FaceRecognizer:
         """
         result = []
         height, width, _ = img.shape
-        self._face_detector.setInputSize((width, height))
+        self._face_detector.setInputSize(self._TELLO_RES)
         try:
             _, faces = self._face_detector.detect(img)
             if len(faces) == 0:
@@ -172,11 +173,12 @@ class FaceRecognizer:
         """
         best_sim = 0.0
         best_match = None
-        for name, encoding in self.encodings.items():
-            sim = self._face_recognizer.match(unknown_encoding, encoding, cv.FACE_RECOGNIZER_SF_FR_COSINE)
-            if best_match is None or sim > best_sim:
-                best_match = name
-                best_sim = sim
+        for name, named_encodings in self.encodings.items():
+            for encoding in named_encodings:
+                sim = self._face_recognizer.match(unknown_encoding, encoding, cv.FACE_RECOGNIZER_SF_FR_COSINE)
+                if best_match is None or sim > best_sim:
+                    best_match = name
+                    best_sim = sim
         if best_match is None or best_sim < self._COSINE_THRESHOLD:
             return "Unknown"
         return best_match
@@ -190,4 +192,7 @@ class FaceRecognizer:
         :return:
             The bounding box converted to integers in the order (top, left, height, width)
         """
+        print("Extraction")
+        print(raw_face_location)
+        print(list(map(int, raw_face_location))[:4])
         return list(map(int, raw_face_location))[:4]

@@ -20,7 +20,9 @@ import cv2
 
 def drive_tello():
     drone = TelloDrone()
-    hud = TelloArucoHud(drone)
+    recognizer = FaceRecognizer()
+    recognizer.encode_face("Dr. H", "DrH1.jpg")
+    hud = TelloFaceHud(drone, recognizer)
     drone.start()
     hud.start()
     sleep(6)
