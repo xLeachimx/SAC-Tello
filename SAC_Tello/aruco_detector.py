@@ -57,11 +57,11 @@ class ArucoDetector:
         if len(corners) == 0:
             return detected_markers
         for location, num in zip(corners, ids):
-            nada, R, t = ArucoDetector.my_estimatePoseSingleMarkers(location, self._MARKER_SIZE_CM,
+            _, R, _ = ArucoDetector.my_estimatePoseSingleMarkers(location, self._MARKER_SIZE_CM,
                                                      self._CAMERA_PARAMETERS,
                                                      self._DISTORTION_PARAMETERS)
             distance = int(R[0][0][2])
-            detected_markers.append((num, ArucoDetector.__convert_corners_to_rect(location), distance))
+            detected_markers.append((num[0], ArucoDetector.__convert_corners_to_rect(location), distance))
         return detected_markers
 
     @staticmethod
