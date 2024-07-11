@@ -192,7 +192,4 @@ class FaceRecognizer:
         :return:
             The bounding box converted to integers in the order (top, left, height, width)
         """
-        print("Extraction")
-        print(raw_face_location)
-        print(list(map(int, raw_face_location))[:4])
         return list(map(int, raw_face_location))[:4]
